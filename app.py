@@ -8,13 +8,17 @@ Usa produccion_prueba.db con datos de ejemplo, en http://127.0.0.1:5001.
 Nunca abre produccion.db.
 """
 
+import io
+import re
 import secrets
 import socket
 import sqlite3
 import sys
 import threading
+import unicodedata
 import webbrowser
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -25,6 +29,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -32,6 +37,7 @@ import base_datos
 import calculos
 import datos_prueba
 import formato
+import informe_pdf
 from validacion import validar_registro
 
 # 127.0.0.1 = solo esta laptop; nadie más en la red puede abrir la app
@@ -39,6 +45,8 @@ HOST = "127.0.0.1"
 PUERTO = 5000
 # Otro puerto para el modo prueba: así nunca se confunde con la app real abierta
 PUERTO_PRUEBA = 5001
+
+RUTA_LOGO = Path(__file__).parent / "logo-adipolyu.png"
 
 PERIODOS = {
     "esta": "Esta semana",
@@ -50,11 +58,12 @@ PERIODOS = {
 rutas = Blueprint("produccion", __name__)
 
 
-def crear_app(ruta_db=None, modo_prueba=False):
+def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
     """Arma la app. Las pruebas le pasan la ruta de una base de prueba."""
     app = Flask(__name__)
     app.config["RUTA_DB"] = ruta_db or base_datos.ruta_base()
     app.config["MODO_PRUEBA"] = modo_prueba
+    app.config["RUTA_LOGO"] = ruta_logo
     # Firma los mensajes de "registro guardado"; se renueva en cada arranque
     app.secret_key = secrets.token_hex(16)
 
@@ -153,7 +162,59 @@ def _mostrar_formulario(valores, errores, piezas=None, materiales=None, corrigie
 
 @rutas.get("/historial")
 def historial():
-    filtros = _leer_filtros(request.args, date.today())
+    filtros, registros, totales = _consultar(request.args)
+    return render_template(
+        "historial.html",
+        registros=registros,
+        totales=totales,
+        filtros=filtros,
+        periodos=PERIODOS,
+        piezas=base_datos.listar_todas_las_piezas(_conexion()),
+        materiales=base_datos.listar_todos_los_materiales(_conexion()),
+        hoy=date.today().isoformat(),
+        # Corregir y borrar vuelven aquí, con los mismos filtros
+        aqui=request.full_path,
+        # El PDF sale de lo mismo que se está viendo
+        url_pdf=url_for(".descargar_pdf", **request.args.to_dict()),
+    )
+
+
+@rutas.get("/historial/pdf")
+def descargar_pdf():
+    filtros, registros, totales = _consultar(request.args)
+    if not registros:
+        flash("No hay registros en este periodo, así que no se generó el informe.", "error")
+        return redirect(url_for(".historial", **request.args.to_dict()))
+
+    ruta_logo = current_app.config["RUTA_LOGO"]
+    if not Path(ruta_logo).is_file():
+        current_app.logger.warning(
+            "No se encontró el logo en %s. El PDF lleva 'ADIPOLYU' en su lugar.", ruta_logo
+        )
+
+    pieza = _nombre_elegido(base_datos.listar_todas_las_piezas(_conexion()), filtros["pieza_id"])
+    material = _nombre_elegido(
+        base_datos.listar_todos_los_materiales(_conexion()), filtros["material_id"]
+    )
+    pdf = informe_pdf.generar_informe(
+        registros,
+        totales,
+        _textos_informe(filtros, registros, totales, pieza, material),
+        modo_prueba=current_app.config["MODO_PRUEBA"],
+        ruta_logo=ruta_logo,
+    )
+    return send_file(
+        io.BytesIO(pdf),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=_nombre_archivo_pdf(filtros, registros, pieza, material),
+    )
+
+
+def _consultar(args):
+    """Lo que comparten el historial y el PDF: filtros, registros vigentes
+    (sin la papelera) y totales. Así los dos muestran siempre lo mismo."""
+    filtros = _leer_filtros(args, date.today())
     if filtros["error"]:
         registros = []
     else:
@@ -164,18 +225,68 @@ def historial():
             pieza_id=filtros["pieza_id"],
             material_id=filtros["material_id"],
         )
-    return render_template(
-        "historial.html",
-        registros=registros,
-        totales=calculos.totales(registros),
-        filtros=filtros,
-        periodos=PERIODOS,
-        piezas=base_datos.listar_todas_las_piezas(_conexion()),
-        materiales=base_datos.listar_todos_los_materiales(_conexion()),
-        hoy=date.today().isoformat(),
-        # Corregir y borrar vuelven aquí, con los mismos filtros
-        aqui=request.full_path,
-    )
+    return filtros, registros, calculos.totales(registros)
+
+
+def _nombre_elegido(opciones, elegido_id):
+    """Nombre de la pieza o material del filtro; None si son todas."""
+    return next((fila["nombre"] for fila in opciones if fila["id"] == elegido_id), None)
+
+
+def _textos_informe(filtros, registros, totales, pieza, material):
+    # Fechas reales del primer y último pedido, para periodos sin límite
+    primera = formato.texto_fecha(registros[-1]["fecha"])
+    ultima = formato.texto_fecha(registros[0]["fecha"])
+    desde, hasta = filtros["desde"], filtros["hasta"]
+
+    if filtros["periodo"] in ("esta", "pasada"):
+        titulo = "Producción de la semana"
+        subtitulo = (
+            f"Lunes {formato.texto_fecha(desde)} al domingo {formato.texto_fecha(hasta)}"
+        )
+    elif desde and hasta:
+        titulo = f"Producción del {formato.texto_fecha(desde)} al {formato.texto_fecha(hasta)}"
+        subtitulo = f"Pedidos del {primera} al {ultima}"
+    elif desde:
+        titulo = f"Producción desde el {formato.texto_fecha(desde)}"
+        subtitulo = f"Pedidos del {primera} al {ultima}"
+    elif hasta:
+        titulo = f"Producción hasta el {formato.texto_fecha(hasta)}"
+        subtitulo = f"Pedidos del {primera} al {ultima}"
+    else:
+        titulo = "Producción: todos los registros"
+        subtitulo = f"Pedidos del {primera} al {ultima}"
+
+    if pieza or material:
+        elegido = " · ".join(
+            texto for texto in (pieza and f"Pieza: {pieza}", material and f"Material: {material}")
+            if texto
+        )
+    else:
+        elegido = "Todas las piezas y materiales"
+    pedidos = totales["pedidos"]
+    return {
+        "titulo": titulo,
+        "subtitulo": subtitulo,
+        "detalle": f"{elegido} · {pedidos} {'pedido' if pedidos == 1 else 'pedidos'}",
+        "generado_en": datetime.now().strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+def _nombre_archivo_pdf(filtros, registros, pieza, material):
+    """produccion_2026-10-19_al_2026-10-25.pdf (las fechas al revés se ordenan solas)."""
+    desde = filtros["desde"] or registros[-1]["fecha"]
+    hasta = filtros["hasta"] or registros[0]["fecha"]
+    partes = ["produccion", desde, "al", hasta]
+    partes += [_para_nombre_de_archivo(nombre) for nombre in (pieza, material) if nombre]
+    nombre = "_".join(partes) + ".pdf"
+    return "PRUEBA_" + nombre if current_app.config["MODO_PRUEBA"] else nombre
+
+
+def _para_nombre_de_archivo(texto):
+    """'silicona naranja' -> 'silicona-naranja' y 'retén' -> 'reten'."""
+    sin_tildes = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", sin_tildes.lower()).strip("-")
 
 
 @rutas.route("/registro/<int:registro_id>/corregir", methods=["GET", "POST"])

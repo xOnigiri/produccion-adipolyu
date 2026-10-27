@@ -38,6 +38,7 @@ def totales(registros):
     por_material = {}
     por_pieza = {}
     lona_usada = 0.0
+    lona_sobrante = 0.0
     for registro in registros:
         nombre = registro["material"]
         material = por_material.setdefault(
@@ -50,12 +51,16 @@ def totales(registros):
 
         if registro["lleva_lona"]:
             lona_usada += lona_usada_g(registro)
+            lona_sobrante += registro["lona_sobrante_g"]
 
     return {
         "pedidos": len(registros),
         "piezas": sum(por_pieza.values()),
         "material_usado_g": sum(m["usado_g"] for m in por_material.values()),
         "lona_usada_g": lona_usada,
+        "lona_sobrante_g": lona_sobrante,
+        # Hubo algún pedido con lona (para mostrar la línea de lona en los resúmenes)
+        "con_lona": any(registro["lleva_lona"] for registro in registros),
         "por_material": [por_material[nombre] for nombre in sorted(por_material)],
         "por_pieza": [
             {"pieza": nombre, "cantidad": por_pieza[nombre]} for nombre in sorted(por_pieza)

@@ -4,7 +4,15 @@ import unittest
 from datetime import date
 
 from calculos import gramos_por_pieza, lona_usada_g, material_usado_g, semana_de, totales
-from formato import redondear, texto_fecha_hora, texto_g_por_pieza, texto_gramos, texto_kg
+from formato import (
+    numero_g_por_pieza,
+    numero_kg,
+    redondear,
+    texto_fecha_hora,
+    texto_g_por_pieza,
+    texto_gramos,
+    texto_kg,
+)
 
 
 def registro(**cambios):
@@ -80,6 +88,18 @@ class TotalesTest(unittest.TestCase):
             [{"pieza": "anillo", "cantidad": 120}, {"pieza": "retén", "cantidad": 80}],
         )
 
+    def test_lona_usada_y_sobrante_del_periodo(self):
+        resultado = totales([
+            registro(lona_recibida_g=600, lona_sobrante_g=75),
+            registro(),
+            registro(**SIN_LONA),
+        ])
+        self.assertTrue(resultado["con_lona"])
+        self.assertEqual(resultado["lona_usada_g"], 745)
+        self.assertEqual(resultado["lona_sobrante_g"], 105)
+        self.assertEqual(texto_kg(resultado["lona_sobrante_g"]), "0.11 kg")
+        self.assertFalse(totales([registro(**SIN_LONA)])["con_lona"])
+
     def test_sin_registros(self):
         resultado = totales([])
         self.assertEqual(resultado["pedidos"], 0)
@@ -132,6 +152,12 @@ class RedondeoTest(unittest.TestCase):
         self.assertEqual(texto_g_por_pieza(15.45), "15.5 g")
         self.assertEqual(texto_g_por_pieza(0.25), "0.3 g")
         self.assertEqual(texto_g_por_pieza(64.01), "64 g")
+
+    def test_numeros_sin_unidad_para_el_pdf(self):
+        self.assertEqual(numero_kg(745), "0.75")
+        self.assertEqual(numero_kg(3200.5), "3.20")
+        self.assertEqual(numero_g_por_pieza(15.45), "15.5")
+        self.assertEqual(numero_g_por_pieza(64.01), "64")
 
     def test_redondear(self):
         self.assertEqual(str(redondear(2.5, 0)), "3")

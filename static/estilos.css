@@ -337,6 +337,39 @@ a.boton {
   margin: 0 0 12px;
 }
 
+/* Periodo elegido a la izquierda, botón del PDF a la derecha */
+.barra-periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.barra-periodo .periodo-elegido {
+  margin: 0;
+}
+
+.boton-pdf {
+  display: inline-block;
+  width: auto;
+  padding: 8px 18px;
+}
+
+.boton-apagado,
+.boton-apagado:hover {
+  background: #d5dbe2;
+  color: var(--texto-suave);
+  cursor: not-allowed;
+}
+
+/* La lona no es un material del pedido: se separa con una línea */
+.fila-lona td {
+  border-top: 2px solid var(--principal);
+  font-style: italic;
+}
+
 .vacio {
   padding: 24px;
   background: var(--tarjeta);

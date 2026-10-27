@@ -43,15 +43,25 @@ def texto_gramos(gramos):
     return _sin_ceros_sobrantes(redondear(gramos, 2))
 
 
+def numero_kg(gramos):
+    """3200.5 g -> '3.20' y 745 g -> '0.75' (sin la unidad, para tablas con '(kg)' arriba)."""
+    kilos = Decimal(str(gramos)) / 1000  # división exacta, sin ruido
+    return format(redondear(kilos, 2), "f")
+
+
 def texto_kg(gramos):
     """3200.5 g -> '3.20 kg' y 745 g -> '0.75 kg'."""
-    kilos = Decimal(str(gramos)) / 1000  # división exacta, sin ruido
-    return f"{format(redondear(kilos, 2), 'f')} kg"
+    return f"{numero_kg(gramos)} kg"
+
+
+def numero_g_por_pieza(gramos):
+    """64.01 -> '64' y 15.45 -> '15.5' (un decimal basta para el promedio)."""
+    return _sin_ceros_sobrantes(redondear(gramos, 1))
 
 
 def texto_g_por_pieza(gramos):
-    """64.01 -> '64 g' y 15.45 -> '15.5 g' (un decimal basta para el promedio)."""
-    return _sin_ceros_sobrantes(redondear(gramos, 1)) + " g"
+    """64.01 -> '64 g' y 15.45 -> '15.5 g'."""
+    return numero_g_por_pieza(gramos) + " g"
 
 
 def describir_registro(registro):

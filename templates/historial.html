@@ -54,12 +54,20 @@
   </div>
 </form>
 
-<p class="periodo-elegido">
-  <strong>{{ filtros.descripcion }}</strong>
-  {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre }}{% endfor %}
-  {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre }}{% endfor %}
-  · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
-</p>
+<div class="barra-periodo">
+  <p class="periodo-elegido">
+    <strong>{{ filtros.descripcion }}</strong>
+    {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre }}{% endfor %}
+    {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre }}{% endfor %}
+    · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
+  </p>
+  {# El PDF sale de lo que se ve en pantalla: mismo periodo y mismos filtros #}
+  {% if registros %}
+    <a href="{{ url_pdf }}" class="boton boton-pdf">Descargar PDF</a>
+  {% else %}
+    <span class="boton boton-pdf boton-apagado" aria-disabled="true">No hay registros para el informe</span>
+  {% endif %}
+</div>
 
 {% if filtros.error %}
   <p class="aviso aviso-error" role="alert">{{ filtros.error }}</p>
@@ -149,6 +157,13 @@
               <td class="numero">{{ fila.sobrante_g|kg }}</td>
             </tr>
           {% endfor %}
+          {% if totales.con_lona %}
+            <tr class="fila-lona">
+              <td>Lona</td>
+              <td class="numero">{{ totales.lona_usada_g|kg }}</td>
+              <td class="numero">{{ totales.lona_sobrante_g|kg }}</td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </section>
