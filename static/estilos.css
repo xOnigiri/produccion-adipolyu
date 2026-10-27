@@ -1,0 +1,204 @@
+/* Estilos de la app de producción Adipolyu */
+
+:root {
+  --fondo: #f4f5f7;
+  --tarjeta: #ffffff;
+  --texto: #1f2933;
+  --texto-suave: #616e7c;
+  --borde: #cbd2d9;
+  --principal: #1d4e89;
+  --principal-oscuro: #163d6b;
+  --exito-fondo: #e3f6e8;
+  --exito-texto: #1b5e20;
+  --error-fondo: #fde8e8;
+  --error-texto: #b71c1c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.encabezado {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 24px;
+  background: var(--principal);
+  color: #fff;
+}
+
+.marca {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.subtitulo {
+  opacity: 0.85;
+}
+
+.contenido {
+  max-width: 680px;
+  margin: 24px auto;
+  padding: 0 16px;
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+}
+
+/* Avisos generales (arriba del formulario) */
+.aviso {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.aviso-exito {
+  background: var(--exito-fondo);
+  color: var(--exito-texto);
+}
+
+.aviso-exito::before {
+  content: "✔ ";
+}
+
+.aviso-error {
+  background: var(--error-fondo);
+  color: var(--error-texto);
+}
+
+/* Formulario */
+.formulario {
+  background: var(--tarjeta);
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.campo {
+  margin-bottom: 16px;
+}
+
+.campo label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.opcional {
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--principal);
+  outline-offset: 1px;
+}
+
+.con-unidad {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.unidad {
+  color: var(--texto-suave);
+}
+
+.campo-casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campo-casilla input {
+  width: 20px;
+  height: 20px;
+}
+
+.campo-casilla label {
+  margin: 0;
+}
+
+.seccion-lona {
+  margin: 0 0 16px;
+  padding: 12px 16px 0;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.seccion-lona legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+/* Errores por campo */
+.con-error {
+  border-color: var(--error-texto) !important;
+  background: var(--error-fondo) !important;
+}
+
+.error-campo {
+  margin: 4px 0 0;
+  color: var(--error-texto);
+  font-size: 0.92rem;
+}
+
+.boton {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--principal);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.boton:hover {
+  background: var(--principal-oscuro);
+}
+
+@media (max-width: 520px) {
+  .fila {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
