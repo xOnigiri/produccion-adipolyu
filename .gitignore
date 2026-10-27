@@ -1,0 +1,26 @@
+# Bases de datos (datos privados del taller)
+*.db
+*.sqlite
+*.sqlite3
+
+# Respaldos (cualquier carpeta llamada "respaldos" o que empiece así)
+respaldos*/
+**/respaldos*/
+backups/
+
+# Entornos virtuales de Python
+venv/
+.venv/
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+
+# Variables de entorno y claves
+.env
+
+# Configuración local de Claude Code
+.claude/settings.local.json
+
+# Logo: no se sube hasta confirmar que puede ser público
+logo-adipolyu.png
