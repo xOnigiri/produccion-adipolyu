@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block titulo %}Borrar registro{% endblock %}
+
+{% block contenido %}
+<h1>¿Borrar este registro?</h1>
+
+<div class="tarjeta">
+  <p class="registro-a-borrar">{{ descripcion }}</p>
+  {% if registro.observaciones %}
+    <p class="nota">Observaciones: {{ registro.observaciones }}</p>
+  {% endif %}
+  <p>
+    El registro irá a la <strong>Papelera</strong>: dejará de aparecer en el historial y en los
+    informes, pero podrás restaurarlo cuando quieras.
+  </p>
+
+  <form method="post" action="{{ url_for('produccion.borrar', registro_id=registro.id) }}" class="botones">
+    <input type="hidden" name="volver" value="{{ volver }}">
+    <a href="{{ volver }}" class="boton boton-secundario">No, volver</a>
+    <button type="submit" class="boton boton-peligro">Sí, borrar</button>
+  </form>
+</div>
+{% endblock %}

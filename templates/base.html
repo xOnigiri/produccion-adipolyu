@@ -3,16 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titulo %}{% endblock %} · Producción Adipolyu</title>
+  <title>{% if modo_prueba %}[PRUEBA] {% endif %}{% block titulo %}{% endblock %} · Producción Adipolyu</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
 </head>
 <body>
+  {% if modo_prueba %}
+    <div class="franja-prueba" role="note">
+      MODO PRUEBA · Datos de ejemplo. Nada de lo que hagas aquí cambia los registros reales del taller.
+    </div>
+  {% endif %}
+
   <header class="encabezado">
     <span class="marca">Adipolyu</span>
     <span class="subtitulo">Producción del taller</span>
+    {# El enlace de la página abierta se resalta #}
+    {% set pagina = request.endpoint %}
+    <nav class="menu" aria-label="Menú">
+      <a href="{{ url_for('produccion.registrar') }}"
+         {% if pagina in ('produccion.registrar', 'produccion.guardar') %}class="activo" aria-current="page"{% endif %}>Registrar</a>
+      <a href="{{ url_for('produccion.historial') }}"
+         {% if pagina in ('produccion.historial', 'produccion.corregir', 'produccion.confirmar_borrado') %}class="activo" aria-current="page"{% endif %}>Historial</a>
+      <a href="{{ url_for('produccion.papelera') }}"
+         {% if pagina == 'produccion.papelera' %}class="activo" aria-current="page"{% endif %}>Papelera</a>
+    </nav>
   </header>
 
-  <main class="contenido">
+  <main class="contenido {% block ancho %}{% endblock %}">
     {% with mensajes = get_flashed_messages(with_categories=true) %}
       {% for categoria, mensaje in mensajes %}
         <p class="aviso aviso-{{ categoria }}" role="status">{{ mensaje }}</p>

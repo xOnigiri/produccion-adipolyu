@@ -34,11 +34,14 @@ def crear_base_de_prueba(ruta):
         conexion.close()
 
 
-class FormularioTest(unittest.TestCase):
+class PruebaConBase(unittest.TestCase):
+    """Preparación común de las pruebas de páginas: una base temporal nueva
+    (se borra sola al terminar) y un navegador de prueba."""
+
     def setUp(self):
-        carpeta = tempfile.TemporaryDirectory()
-        self.addCleanup(carpeta.cleanup)
-        self.ruta_db = Path(carpeta.name) / "prueba.db"
+        # enterContext la borra sola al terminar cada prueba (Pylint no lo reconoce)
+        carpeta = self.enterContext(tempfile.TemporaryDirectory())  # pylint: disable=consider-using-with
+        self.ruta_db = Path(carpeta) / "prueba.db"
         crear_base_de_prueba(self.ruta_db)
 
         app = crear_app(self.ruta_db)
@@ -46,14 +49,20 @@ class FormularioTest(unittest.TestCase):
         self.cliente = app.test_client()
 
         conexion = sqlite3.connect(self.ruta_db)
-        self.id_reten = conexion.execute("SELECT id FROM piezas WHERE nombre = 'retén'").fetchone()[0]
-        self.id_nitrilo = conexion.execute(
-            "SELECT id FROM materiales WHERE nombre = 'nitrilo'"
-        ).fetchone()[0]
-        self.id_retirada = conexion.execute(
-            "SELECT id FROM piezas WHERE nombre = 'pieza retirada'"
-        ).fetchone()[0]
-        conexion.close()
+        try:
+            # nombre -> id, para escribir las pruebas con nombres del taller
+            self.piezas = dict(conexion.execute("SELECT nombre, id FROM piezas"))
+            self.materiales = dict(conexion.execute("SELECT nombre, id FROM materiales"))
+        finally:
+            conexion.close()
+
+
+class FormularioTest(PruebaConBase):
+    def setUp(self):
+        super().setUp()
+        self.id_reten = self.piezas["retén"]
+        self.id_nitrilo = self.materiales["nitrilo"]
+        self.id_retirada = self.piezas["pieza retirada"]
 
     def registros(self):
         conexion = sqlite3.connect(self.ruta_db)

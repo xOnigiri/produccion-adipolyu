@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
-{% block titulo %}Registrar producción{% endblock %}
+{# La misma página sirve para registrar un pedido nuevo y para corregir uno guardado #}
+{% block titulo %}{% if corrigiendo %}Corregir registro{% else %}Registrar producción{% endif %}{% endblock %}
 
 {% block contenido %}
 {# Mensaje de error debajo de un campo #}
@@ -29,16 +30,29 @@
   </div>
 {% endmacro %}
 
-<h1>Registrar producción</h1>
+{% if corrigiendo %}
+  <h1>Corregir registro</h1>
+  <p class="corrigiendo">
+    Estás corrigiendo el pedido del {{ corrigiendo.fecha|fecha }} · {{ corrigiendo.pieza }} · {{ corrigiendo.material }}.
+    Se aplican las mismas reglas que al registrar.
+  </p>
+{% else %}
+  <h1>Registrar producción</h1>
+{% endif %}
 
 {% if errores %}
   <p class="aviso aviso-error" role="alert">
-    No se guardó el registro. Revisa los campos marcados en rojo.
+    {% if corrigiendo %}No se guardaron los cambios.{% else %}No se guardó el registro.{% endif %}
+    Revisa los campos marcados en rojo.
     {% if errores.general %}<br>{{ errores.general }}{% endif %}
   </p>
 {% endif %}
 
-<form method="post" action="{{ url_for('produccion.guardar') }}" class="formulario">
+<form method="post" class="formulario"
+      action="{{ url_for('produccion.corregir', registro_id=corrigiendo.id) if corrigiendo else url_for('produccion.guardar') }}">
+  {% if corrigiendo %}
+    <input type="hidden" name="volver" value="{{ volver }}">
+  {% endif %}
   <div class="campo">
     <label for="fecha">Fecha</label>
     <input type="date" id="fecha" name="fecha" required max="{{ hoy }}"
@@ -110,7 +124,14 @@
     {{ error("observaciones") }}
   </div>
 
-  <button type="submit" class="boton">Guardar registro</button>
+  {% if corrigiendo %}
+    <div class="botones">
+      <a href="{{ volver }}" class="boton boton-secundario">Cancelar</a>
+      <button type="submit" class="boton">Guardar cambios</button>
+    </div>
+  {% else %}
+    <button type="submit" class="boton">Guardar registro</button>
+  {% endif %}
 </form>
 {% endblock %}
 

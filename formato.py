@@ -1,10 +1,30 @@
 """Cómo se muestran fechas y pesos en pantalla.
 
-Se usa en el formulario y se reutilizará en el historial y el informe PDF,
+Se usa en el formulario y el historial, y se reutilizará en el informe PDF,
 para que todo muestre los números de la misma forma.
 """
 
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+
+from calculos import lona_usada_g, material_usado_g
+
+
+def redondear(valor, decimales):
+    """Redondeo de toda la app: los que terminan en 5 suben (0.745 -> 0.75).
+
+    No se usa el redondeo de Python porque la computadora guarda 0.745 como
+    0.74499999… y además lleva los 5 al número par. Aquí se parte del número
+    tal como se escribe (str) y se limpia el ruido de las sumas a 9 decimales.
+    """
+    exacto = Decimal(str(valor)).quantize(Decimal("1e-9"), ROUND_HALF_UP)
+    return exacto.quantize(Decimal(1).scaleb(-decimales), ROUND_HALF_UP)
+
+
+def _sin_ceros_sobrantes(numero):
+    """Decimal('3600.50') -> '3600.5' y Decimal('400.00') -> '400'."""
+    texto = format(numero, "f")
+    return texto.rstrip("0").rstrip(".") if "." in texto else texto
 
 
 def texto_fecha(fecha_iso):
@@ -12,30 +32,45 @@ def texto_fecha(fecha_iso):
     return date.fromisoformat(fecha_iso).strftime("%d/%m/%Y")
 
 
+def texto_fecha_hora(texto):
+    """'2026-10-27 18:40:12' -> '27/10/2026 18:40'."""
+    fecha, _, hora = texto.partition(" ")
+    return f"{texto_fecha(fecha)} {hora[:5]}".strip()
+
+
 def texto_gramos(gramos):
-    """3600.5 -> '3600.5' y 400.0 -> '400' (sin ceros sobrantes)."""
-    return f"{gramos:.2f}".rstrip("0").rstrip(".")
+    """3600.5 -> '3600.5' y 400.0 -> '400' (sin ceros sobrantes, hasta 2 decimales)."""
+    return _sin_ceros_sobrantes(redondear(gramos, 2))
 
 
 def texto_kg(gramos):
-    """3200.5 g -> '3.20 kg'."""
-    return f"{gramos / 1000:.2f} kg"
+    """3200.5 g -> '3.20 kg' y 745 g -> '0.75 kg'."""
+    kilos = Decimal(str(gramos)) / 1000  # división exacta, sin ruido
+    return f"{format(redondear(kilos, 2), 'f')} kg"
 
 
-def resumen_registro(registro):
-    """Frase que confirma lo guardado. Recibe una fila de produccion con los
-    nombres de pieza y material ya unidos (ver base_datos.obtener_registro)."""
+def texto_g_por_pieza(gramos):
+    """64.01 -> '64 g' y 15.45 -> '15.5 g' (un decimal basta para el promedio)."""
+    return _sin_ceros_sobrantes(redondear(gramos, 1)) + " g"
+
+
+def describir_registro(registro):
+    """'22/10/2026 · retén · nitrilo · con lona · 50 unidades · material usado 3.20 kg ...'.
+    Recibe una fila de produccion con los nombres de pieza y material ya unidos
+    (ver base_datos.obtener_registro)."""
     partes = [
         texto_fecha(registro["fecha"]),
         registro["pieza"],
         registro["material"],
         "con lona" if registro["lleva_lona"] else "sin lona",
         f"{registro['cantidad']} {'unidad' if registro['cantidad'] == 1 else 'unidades'}",
-        "material usado "
-        + texto_kg(registro["material_recibido_g"] - registro["material_sobrante_g"]),
+        "material usado " + texto_kg(material_usado_g(registro)),
     ]
     if registro["lleva_lona"]:
-        partes.append(
-            "lona usada " + texto_kg(registro["lona_recibida_g"] - registro["lona_sobrante_g"])
-        )
-    return "Registro guardado: " + " · ".join(partes)
+        partes.append("lona usada " + texto_kg(lona_usada_g(registro)))
+    return " · ".join(partes)
+
+
+def resumen_registro(registro):
+    """Frase que confirma lo guardado."""
+    return "Registro guardado: " + describir_registro(registro)

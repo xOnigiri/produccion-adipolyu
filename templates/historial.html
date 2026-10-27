@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block titulo %}Historial{% endblock %}
+{% block ancho %}contenido-ancho{% endblock %}
+
+{% block contenido %}
+<h1>Historial</h1>
+
+<form method="get" action="{{ url_for('produccion.historial') }}" class="filtros">
+  <div class="campo">
+    <label for="periodo">Periodo</label>
+    <select id="periodo" name="periodo">
+      {% for clave, nombre in periodos.items() %}
+        <option value="{{ clave }}" {% if filtros.periodo == clave %}selected{% endif %}>{{ nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# historial.js muestra estas fechas solo con "Elegir fechas" #}
+  <div class="campo campo-rango">
+    <label for="desde">Desde</label>
+    <input type="date" id="desde" name="desde" max="{{ hoy }}"
+           value="{{ filtros.desde if filtros.periodo == 'rango' and filtros.desde else '' }}">
+  </div>
+  <div class="campo campo-rango">
+    <label for="hasta">Hasta</label>
+    <input type="date" id="hasta" name="hasta" max="{{ hoy }}"
+           value="{{ filtros.hasta if filtros.periodo == 'rango' and filtros.hasta else '' }}">
+  </div>
+
+  <div class="campo">
+    <label for="pieza_id">Pieza</label>
+    <select id="pieza_id" name="pieza_id">
+      <option value="">Todas</option>
+      {% for pieza in piezas %}
+        <option value="{{ pieza.id }}" {% if filtros.pieza_id == pieza.id %}selected{% endif %}>{{ pieza.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="campo">
+    <label for="material_id">Material</label>
+    <select id="material_id" name="material_id">
+      <option value="">Todos</option>
+      {% for material in materiales %}
+        <option value="{{ material.id }}" {% if filtros.material_id == material.id %}selected{% endif %}>{{ material.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="acciones-filtro">
+    <button type="submit" class="boton">Filtrar</button>
+    <a href="{{ url_for('produccion.historial') }}" class="boton boton-secundario">Quitar filtros</a>
+  </div>
+</form>
+
+<p class="periodo-elegido">
+  <strong>{{ filtros.descripcion }}</strong>
+  {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre }}{% endfor %}
+  {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre }}{% endfor %}
+  · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
+</p>
+
+{% if filtros.error %}
+  <p class="aviso aviso-error" role="alert">{{ filtros.error }}</p>
+{% elif not registros %}
+  <p class="vacio">No hay registros en este periodo.</p>
+{% else %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          {# Acciones primero y fijas a la izquierda: siempre visibles aunque la tabla se desplace #}
+          <th class="acciones"><span class="solo-lector">Acciones</span></th>
+          <th>Fecha</th>
+          <th>Pieza</th>
+          <th>Material</th>
+          <th>Lona</th>
+          <th class="numero">Cant.</th>
+          <th class="numero">Mat. recibido</th>
+          <th class="numero">Mat. sobrante</th>
+          <th class="numero calculado">Mat. usado</th>
+          <th class="numero calculado">g por pieza</th>
+          <th class="numero">Lona recibida</th>
+          <th class="numero">Lona sobrante</th>
+          <th class="numero calculado">Lona usada</th>
+          <th>Observaciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for registro in registros %}
+          <tr>
+            <td class="acciones">
+              <a href="{{ url_for('produccion.corregir', registro_id=registro.id, volver=aqui) }}">Corregir</a>
+              <a href="{{ url_for('produccion.confirmar_borrado', registro_id=registro.id, volver=aqui) }}" class="enlace-borrar">Borrar</a>
+            </td>
+            <td class="sin-salto">{{ registro.fecha|fecha }}</td>
+            <td>{{ registro.pieza }}</td>
+            <td>{{ registro.material }}</td>
+            <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
+            <td class="numero">{{ registro.cantidad }}</td>
+            <td class="numero">{{ registro.material_recibido_g|gramos }}</td>
+            <td class="numero">{{ registro.material_sobrante_g|gramos }}</td>
+            <td class="numero calculado">{{ registro|material_usado|kg }}</td>
+            <td class="numero calculado">{{ registro|gramos_por_pieza|g_por_pieza }}</td>
+            {% if registro.lleva_lona %}
+              <td class="numero">{{ registro.lona_recibida_g|gramos }}</td>
+              <td class="numero">{{ registro.lona_sobrante_g|gramos }}</td>
+              <td class="numero calculado">{{ registro|lona_usada|kg }}</td>
+            {% else %}
+              <td class="numero vacio-celda">—</td>
+              <td class="numero vacio-celda">—</td>
+              <td class="numero calculado vacio-celda">—</td>
+            {% endif %}
+            <td class="observaciones">{{ registro.observaciones or "" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="acciones">Total</th>
+          <td colspan="4"></td>
+          <td class="numero">{{ totales.piezas }}</td>
+          <td></td>
+          <td></td>
+          <td class="numero calculado">{{ totales.material_usado_g|kg }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td class="numero calculado">{{ totales.lona_usada_g|kg }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="resumenes">
+    <section class="resumen">
+      <h2>Por material</h2>
+      <table class="tabla tabla-resumen">
+        <thead>
+          <tr><th>Material</th><th class="numero">Usado</th><th class="numero">Sobrante</th></tr>
+        </thead>
+        <tbody>
+          {% for fila in totales.por_material %}
+            <tr>
+              <td>{{ fila.material }}</td>
+              <td class="numero">{{ fila.usado_g|kg }}</td>
+              <td class="numero">{{ fila.sobrante_g|kg }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="resumen">
+      <h2>Por pieza</h2>
+      <table class="tabla tabla-resumen">
+        <thead>
+          <tr><th>Pieza</th><th class="numero">Unidades</th></tr>
+        </thead>
+        <tbody>
+          {% for fila in totales.por_pieza %}
+            <tr>
+              <td>{{ fila.pieza }}</td>
+              <td class="numero">{{ fila.cantidad }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='historial.js') }}"></script>
+{% endblock %}

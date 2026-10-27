@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block titulo %}Papelera{% endblock %}
+{% block ancho %}contenido-ancho{% endblock %}
+
+{% block contenido %}
+<h1>Papelera</h1>
+<p class="periodo-elegido">
+  Registros borrados. No cuentan en el historial ni en los informes.
+  Si borraste uno por error, apriétale <strong>Restaurar</strong>.
+</p>
+
+{% if not registros %}
+  <p class="vacio">La papelera está vacía.</p>
+{% else %}
+  <div class="tabla-contenedor">
+    <table class="tabla">
+      <thead>
+        <tr>
+          {# Igual que en el historial: la acción va primero y fija a la izquierda #}
+          <th class="acciones"><span class="solo-lector">Acciones</span></th>
+          <th>Fecha</th>
+          <th>Pieza</th>
+          <th>Material</th>
+          <th>Lona</th>
+          <th class="numero">Cant.</th>
+          <th class="numero calculado">Mat. usado</th>
+          <th>Borrado el</th>
+          <th>Observaciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for registro in registros %}
+          <tr>
+            <td class="acciones">
+              <form method="post" action="{{ url_for('produccion.restaurar', registro_id=registro.id) }}">
+                <button type="submit" class="boton boton-pequeno">Restaurar</button>
+              </form>
+            </td>
+            <td class="sin-salto">{{ registro.fecha|fecha }}</td>
+            <td>{{ registro.pieza }}</td>
+            <td>{{ registro.material }}</td>
+            <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
+            <td class="numero">{{ registro.cantidad }}</td>
+            <td class="numero calculado">{{ registro|material_usado|kg }}</td>
+            <td class="sin-salto">{{ registro.borrado_en|fecha_hora }}</td>
+            <td class="observaciones">{{ registro.observaciones or "" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+{% endblock %}

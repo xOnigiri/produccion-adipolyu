@@ -1,10 +1,15 @@
 """Crea la base de datos produccion.db con sus 3 tablas y las listas iniciales.
 
 Se puede ejecutar varias veces sin riesgo: nunca borra ni sobrescribe datos.
-Solo crea las tablas que falten y agrega las piezas/materiales que no existan.
+Solo crea las tablas que falten, agrega las columnas nuevas que falten
+(como borrado_en, de la papelera) y agrega las piezas/materiales que no existan.
+
+Uso:  python crear_base.py            (base real, produccion.db)
+      python crear_base.py otra.db    (otra base, por ejemplo una copia)
 """
 
 import sqlite3
+import sys
 from pathlib import Path
 
 RUTA_DB = Path(__file__).parent / "produccion.db"
@@ -48,6 +53,8 @@ CREATE TABLE IF NOT EXISTS produccion (
     lona_sobrante_g     REAL,
     observaciones       TEXT,
     registrado_en       TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    -- Vacío = registro vigente. Con fecha y hora = está en la papelera
+    borrado_en          TEXT,
 
     CHECK (material_sobrante_g <= material_recibido_g),
     -- Sin lona: campos de lona vacíos. Con lona: ambos llenos y sobrante <= recibida
@@ -63,14 +70,33 @@ CREATE TABLE IF NOT EXISTS produccion (
 );
 """
 
+# Columnas que se agregaron después de crear la base, en el orden en que llegaron.
+# Una base antigua las recibe vacías; los registros que ya tiene no cambian.
+COLUMNAS_NUEVAS = [
+    ("produccion", "borrado_en", "TEXT"),  # Parte 4: papelera
+]
 
-def crear_base():
-    ya_existia = RUTA_DB.exists()
 
-    conexion = sqlite3.connect(RUTA_DB)
+def agregar_columnas_nuevas(conexion):
+    """Agrega a una base antigua las columnas que le falten. Devuelve sus nombres."""
+    agregadas = []
+    for tabla, columna, tipo in COLUMNAS_NUEVAS:
+        existentes = {fila[1] for fila in conexion.execute(f"PRAGMA table_info({tabla})")}
+        if columna not in existentes:
+            conexion.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+            agregadas.append(columna)
+    return agregadas
+
+
+def crear_base(ruta=RUTA_DB, informar=True):
+    ruta = Path(ruta)
+    ya_existia = ruta.exists()
+
+    conexion = sqlite3.connect(ruta)
     try:
         conexion.execute("PRAGMA foreign_keys = ON")
         conexion.executescript(ESQUEMA)
+        columnas_agregadas = agregar_columnas_nuevas(conexion)
 
         # INSERT OR IGNORE: si el nombre ya está, no lo duplica
         nuevas_piezas = 0
@@ -95,14 +121,18 @@ def crear_base():
     finally:
         conexion.close()
 
+    if not informar:
+        return
     if ya_existia:
-        print(f"La base ya existía en {RUTA_DB}. No se borró nada.")
+        print(f"La base ya existía en {ruta}. No se borró nada.")
     else:
-        print(f"Base creada en {RUTA_DB}")
+        print(f"Base creada en {ruta}")
+    for columna in columnas_agregadas:
+        print(f"Columna nueva agregada: {columna} (los registros existentes no cambian)")
     print(f"Piezas: {total_piezas} ({nuevas_piezas} agregadas ahora)")
     print(f"Materiales: {total_materiales} ({nuevos_materiales} agregados ahora)")
     print(f"Registros de producción: {total_registros}")
 
 
 if __name__ == "__main__":
-    crear_base()
+    crear_base(sys.argv[1] if len(sys.argv) > 1 else RUTA_DB)

@@ -87,7 +87,8 @@ class RegistroValidoTest(unittest.TestCase):
 
 
 class RegistroConErroresTest(unittest.TestCase):
-    def assertError(self, datos, campo, contiene):
+    # Se llama como los assert de unittest a propósito
+    def assertError(self, datos, campo, contiene):  # pylint: disable=invalid-name
         registro, errores = validar(datos)
         self.assertIsNone(registro)
         self.assertIn(campo, errores)
@@ -120,11 +121,17 @@ class RegistroConErroresTest(unittest.TestCase):
         )
 
     def test_pesos_negativos_o_con_letras(self):
-        self.assertError(formulario(material_sobrante_g="-5"), "material_sobrante_g", "menor que 0")
-        self.assertError(formulario(material_recibido_g="tres mil"), "material_recibido_g", "solo con números")
+        self.assertError(
+            formulario(material_sobrante_g="-5"), "material_sobrante_g", "menor que 0"
+        )
+        self.assertError(
+            formulario(material_recibido_g="tres mil"), "material_recibido_g", "solo con números"
+        )
 
     def test_peso_demasiado_grande(self):
-        self.assertError(formulario(material_recibido_g="36005000"), "material_recibido_g", "sobra un cero")
+        self.assertError(
+            formulario(material_recibido_g="36005000"), "material_recibido_g", "sobra un cero"
+        )
 
     def test_cantidad(self):
         casos = {
