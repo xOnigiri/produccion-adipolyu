@@ -2,7 +2,7 @@
 
 Se puede ejecutar varias veces sin riesgo: nunca borra ni sobrescribe datos.
 Solo crea las tablas que falten, agrega las columnas nuevas que falten
-(como borrado_en, de la papelera) y carga las piezas/materiales iniciales
+(como borrado_en, de la papelera, o dureza_shore_a) y carga las piezas/materiales iniciales
 en una lista vacía. Una lista que ya tiene nombres no se toca: así no
 reaparece un nombre corregido o desactivado desde la página "Listas".
 
@@ -28,7 +28,16 @@ MATERIALES_INICIALES = [
     "jebe celeste",
 ]
 
-ESQUEMA = """
+# Durezas que se pueden anotar en un pedido (opcional). La base rechaza cualquier otra.
+DUREZAS_SHORE_A = (60, 65, 70, 75, 80, 85, 90, 95, 100)
+
+DEFINICION_DUREZA = (
+    "INTEGER CHECK (dureza_shore_a IS NULL OR dureza_shore_a IN ("
+    + ", ".join(str(dureza) for dureza in DUREZAS_SHORE_A)
+    + "))"
+)
+
+ESQUEMA = f"""
 CREATE TABLE IF NOT EXISTS piezas (
     id     INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre TEXT    NOT NULL UNIQUE COLLATE NOCASE,
@@ -57,6 +66,8 @@ CREATE TABLE IF NOT EXISTS produccion (
     registrado_en       TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
     -- Vacío = registro vigente. Con fecha y hora = está en la papelera
     borrado_en          TEXT,
+    -- Vacío = sin dato. Va al final, igual que en una base antigua que la recibe después
+    dureza_shore_a      {DEFINICION_DUREZA},
 
     CHECK (material_sobrante_g <= material_recibido_g),
     -- Sin lona: campos de lona vacíos. Con lona: ambos llenos y sobrante <= recibida
@@ -76,6 +87,7 @@ CREATE TABLE IF NOT EXISTS produccion (
 # Una base antigua las recibe vacías; los registros que ya tiene no cambian.
 COLUMNAS_NUEVAS = [
     ("produccion", "borrado_en", "TEXT"),  # Parte 4: papelera
+    ("produccion", "dureza_shore_a", DEFINICION_DUREZA),  # dureza del material
 ]
 
 

@@ -11,6 +11,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
+from crear_base import DUREZAS_SHORE_A
 from formato import texto_gramos
 
 # Límites de sentido común para atrapar errores de tipeo (un cero de más)
@@ -83,6 +84,7 @@ def validar_registro(formulario, piezas_validas, materiales_validos, hoy=None):
     registro["material_id"] = _validar_opcion(
         formulario, "material_id", materiales_validos, "Elige un material de la lista.", errores
     )
+    registro["dureza_shore_a"] = _validar_dureza(formulario, errores)
     registro["cantidad"] = _validar_cantidad(formulario, errores)
     registro["material_recibido_g"], registro["material_sobrante_g"] = _validar_par_de_pesos(
         formulario, MATERIAL, errores
@@ -122,6 +124,17 @@ def _validar_opcion(formulario, campo, ids_validos, mensaje, errores):
     texto = formulario.get(campo, "").strip()
     if not texto.isdigit() or int(texto) not in ids_validos:
         errores[campo] = mensaje
+        return None
+    return int(texto)
+
+
+def _validar_dureza(formulario, errores):
+    """Opcional: vacío = sin dato. Si viene, debe ser una de la lista (60, 65 … 100)."""
+    texto = formulario.get("dureza_shore_a", "").strip()
+    if not texto:
+        return None
+    if not texto.isdigit() or int(texto) not in DUREZAS_SHORE_A:
+        errores["dureza_shore_a"] = "Elige una dureza de la lista o «— sin dato —»."
         return None
     return int(texto)
 

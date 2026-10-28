@@ -64,14 +64,19 @@ def texto_g_por_pieza(gramos):
     return numero_g_por_pieza(gramos) + " g"
 
 
+def texto_dureza(dureza):
+    """70 -> '70' y None -> '—' (pedido sin dureza anotada)."""
+    return "—" if dureza is None else str(dureza)
+
+
 def describir_registro(registro):
-    """'22/10/2026 · retén · nitrilo · con lona · 50 unidades · material usado 3.20 kg ...'.
+    """'22/10/2026 · retén · nitrilo · 70 Shore A · con lona · 50 unidades · material usado ...'.
     Recibe una fila de produccion con los nombres de pieza y material ya unidos
-    (ver base_datos.obtener_registro)."""
-    partes = [
-        texto_fecha(registro["fecha"]),
-        registro["pieza"],
-        registro["material"],
+    (ver base_datos.obtener_registro). Sin dureza, esa parte no aparece."""
+    partes = [texto_fecha(registro["fecha"]), registro["pieza"], registro["material"]]
+    if registro["dureza_shore_a"] is not None:
+        partes.append(f"{registro['dureza_shore_a']} Shore A")
+    partes += [
         "con lona" if registro["lleva_lona"] else "sin lona",
         f"{registro['cantidad']} {'unidad' if registro['cantidad'] == 1 else 'unidades'}",
         "material usado " + texto_kg(material_usado_g(registro)),

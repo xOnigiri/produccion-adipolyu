@@ -15,7 +15,10 @@ VARIABLE_RUTA = "ADIPOLYU_DB"
 TABLAS_NECESARIAS = {"piezas", "materiales", "produccion"}
 
 # Columnas que llegaron después de la primera versión de la base
-COLUMNAS_NECESARIAS = {"produccion": {"borrado_en"}}
+COLUMNAS_NECESARIAS = {"produccion": {"borrado_en", "dureza_shore_a"}}
+
+# Filtro del historial: pedidos sin dureza anotada
+SIN_DUREZA = "sin-dato"
 
 
 class BaseNoDisponible(Exception):
@@ -173,11 +176,11 @@ def guardar_registro(conexion, registro):
         cursor = conexion.execute(
             """
             INSERT INTO produccion (
-                fecha, pieza_id, material_id, lleva_lona, cantidad,
+                fecha, pieza_id, material_id, dureza_shore_a, lleva_lona, cantidad,
                 material_recibido_g, material_sobrante_g,
                 lona_recibida_g, lona_sobrante_g, observaciones
             ) VALUES (
-                :fecha, :pieza_id, :material_id, :lleva_lona, :cantidad,
+                :fecha, :pieza_id, :material_id, :dureza_shore_a, :lleva_lona, :cantidad,
                 :material_recibido_g, :material_sobrante_g,
                 :lona_recibida_g, :lona_sobrante_g, :observaciones
             )
@@ -203,19 +206,26 @@ def obtener_registro(conexion, registro_id):
     ).fetchone()
 
 
-def listar_registros(conexion, desde=None, hasta=None, pieza_id=None, material_id=None):
+def listar_registros(  # pylint: disable=too-many-arguments
+    conexion, *, desde=None, hasta=None, pieza_id=None, material_id=None, dureza=None
+):
     """Registros vigentes (no los de la papelera), del más reciente al más antiguo.
 
     desde / hasta: fechas 'AAAA-MM-DD' incluidas; None = sin límite.
     pieza_id / material_id: None = todas / todos.
+    dureza: 70 = solo Shore A 70; SIN_DUREZA = solo los que no la tienen; None = todas.
     """
     condiciones = ["produccion.borrado_en IS NULL"]
     valores = []
+    if dureza == SIN_DUREZA:
+        condiciones.append("produccion.dureza_shore_a IS NULL")
+        dureza = None
     for condicion, valor in (
         ("produccion.fecha >= ?", desde),
         ("produccion.fecha <= ?", hasta),
         ("produccion.pieza_id = ?", pieza_id),
         ("produccion.material_id = ?", material_id),
+        ("produccion.dureza_shore_a = ?", dureza),
     ):
         if valor is not None:
             condiciones.append(condicion)
@@ -246,6 +256,7 @@ def actualizar_registro(conexion, registro_id, registro):
             """
             UPDATE produccion SET
                 fecha = :fecha, pieza_id = :pieza_id, material_id = :material_id,
+                dureza_shore_a = :dureza_shore_a,
                 lleva_lona = :lleva_lona, cantidad = :cantidad,
                 material_recibido_g = :material_recibido_g,
                 material_sobrante_g = :material_sobrante_g,

@@ -50,6 +50,7 @@ COLUMNAS = [
     ("Fecha", 2.0, False, False),
     ("Pieza", 2.6, False, False),
     ("Material", 3.4, False, False),
+    ("Dureza", 1.5, True, False),  # Shore A
     ("Lona", 1.3, False, False),
     ("Cant.", 1.3, True, False),
     ("Mat. recibido (g)", 2.1, True, False),
@@ -179,6 +180,7 @@ def filas_de_pedidos(registros, totales):
             formato.texto_fecha(registro["fecha"]),
             registro["pieza"],
             registro["material"],
+            formato.texto_dureza(registro["dureza_shore_a"]),
             "Sí" if registro["lleva_lona"] else "No",
             str(registro["cantidad"]),
             formato.texto_gramos(registro["material_recibido_g"]),
@@ -189,7 +191,7 @@ def filas_de_pedidos(registros, totales):
             registro["observaciones"] or "",
         ])
     filas.append([
-        "TOTAL", "", "", "",
+        "TOTAL", "", "", "", "",
         str(totales["piezas"]),
         "", "",
         formato.numero_kg(totales["material_usado_g"]),
@@ -211,7 +213,7 @@ def _tabla_pedidos(registros, totales):
     filas = filas_de_pedidos(registros, totales)
     # Pieza, material y observaciones bajan de línea si son largas
     for fila in filas[:-1]:
-        for indice in (1, 2, 10):
+        for indice in (1, 2, len(COLUMNAS) - 1):
             fila[indice] = Paragraph(escape(fila[indice]), CELDA)
 
     ultima = len(filas)  # la fila TOTAL (la 0 es la de títulos)

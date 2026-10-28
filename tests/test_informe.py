@@ -173,17 +173,32 @@ class InformeSinWebTest(unittest.TestCase):
 
     def test_filas_de_la_tabla(self):
         registros = [{
-            "fecha": "2026-10-22", "pieza": "retén", "material": "nitrilo", "lleva_lona": 0,
+            "fecha": "2026-10-22", "pieza": "retén", "material": "nitrilo",
+            "dureza_shore_a": 70, "lleva_lona": 0,
             "cantidad": 50, "material_recibido_g": 3600.5, "material_sobrante_g": 400.0,
             "lona_recibida_g": None, "lona_sobrante_g": None, "observaciones": None,
         }]
         filas = informe_pdf.filas_de_pedidos(registros, calculos.totales(registros))
         self.assertEqual(
             filas[0],
-            ["22/10/2026", "retén", "nitrilo", "No", "50", "3600.5", "400", "3.20", "64", "—", ""],
+            ["22/10/2026", "retén", "nitrilo", "70", "No", "50", "3600.5", "400", "3.20", "64",
+             "—", ""],
         )
+        self.assertEqual(len(filas[0]), len(informe_pdf.COLUMNAS))
+        self.assertEqual(len(filas[-1]), len(informe_pdf.COLUMNAS))
         self.assertEqual(filas[-1][0], "TOTAL")
-        self.assertEqual(filas[-1][7], "3.20")
+        self.assertEqual(filas[-1][8], "3.20")
+
+    def test_sin_dureza_muestra_guion(self):
+        registros = [{
+            "fecha": "2026-10-22", "pieza": "anillo", "material": "silicona naranja",
+            "dureza_shore_a": None, "lleva_lona": 0,
+            "cantidad": 120, "material_recibido_g": 2000, "material_sobrante_g": 150,
+            "lona_recibida_g": None, "lona_sobrante_g": None, "observaciones": None,
+        }]
+        filas = informe_pdf.filas_de_pedidos(registros, calculos.totales(registros))
+        self.assertEqual(filas[0][3], "—")
+        self.assertEqual(informe_pdf.COLUMNAS[3][0], "Dureza")
 
     def test_nombre_de_archivo_sin_tildes_ni_espacios(self):
         self.assertEqual(_para_nombre_de_archivo("retén"), "reten")

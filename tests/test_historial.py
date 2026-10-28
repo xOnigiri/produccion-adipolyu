@@ -22,6 +22,7 @@ PEDIDO = {
     "sobrante": 400,
     "lona": (250, 30),
     "observaciones": None,
+    "dureza": None,
 }
 
 
@@ -37,8 +38,8 @@ class ConHistorial(PruebaConBase):
             cursor = conexion.execute(
                 """INSERT INTO produccion (fecha, pieza_id, material_id, lleva_lona, cantidad,
                        material_recibido_g, material_sobrante_g, lona_recibida_g,
-                       lona_sobrante_g, observaciones)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       lona_sobrante_g, observaciones, dureza_shore_a)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fecha.isoformat(),
                     self.piezas[pedido["pieza"]],
@@ -50,6 +51,7 @@ class ConHistorial(PruebaConBase):
                     lona[0] if lona else None,
                     lona[1] if lona else None,
                     pedido["observaciones"],
+                    pedido["dureza"],
                 ),
             )
             conexion.commit()
@@ -111,7 +113,7 @@ class VerHistorialTest(ConHistorial):
         self.assertEqual(len(filas), 2)
 
     def test_sin_lona_muestra_guion(self):
-        self.insertar(HOY, lona=None)
+        self.insertar(HOY, lona=None, dureza=70)
         html = self.html("/historial")
         self.assertEqual(html.count('vacio-celda">—'), 3)
 

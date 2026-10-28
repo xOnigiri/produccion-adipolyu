@@ -37,6 +37,7 @@ from flask import (
 
 import base_datos
 import calculos
+import crear_base
 import datos_prueba
 import formato
 import informe_pdf
@@ -128,9 +129,12 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
         material_usado=calculos.material_usado_g,
         lona_usada=calculos.lona_usada_g,
         gramos_por_pieza=calculos.gramos_por_pieza,
+        dureza=formato.texto_dureza,
         uso=_texto_uso,
     )
     app.jinja_env.globals["max_nombre"] = MAX_NOMBRE
+    app.jinja_env.globals["durezas"] = crear_base.DUREZAS_SHORE_A
+    app.jinja_env.globals["sin_dureza"] = base_datos.SIN_DUREZA
     app.context_processor(lambda: {"modo_prueba": app.config["MODO_PRUEBA"]})
     app.context_processor(_aviso_respaldo)
     return app
@@ -260,6 +264,15 @@ def descargar_pdf():
     )
 
 
+def _texto_filtro_dureza(dureza):
+    """'Dureza: 70 Shore A', 'Dureza: sin dato' o None si se ven todas."""
+    if dureza is None:
+        return None
+    if dureza == base_datos.SIN_DUREZA:
+        return "Dureza: sin dato"
+    return f"Dureza: {dureza} Shore A"
+
+
 def _consultar(args):
     """Lo que comparten el historial y el PDF: filtros, registros vigentes
     (sin la papelera) y totales. Así los dos muestran siempre lo mismo."""
@@ -273,6 +286,7 @@ def _consultar(args):
             hasta=filtros["hasta"],
             pieza_id=filtros["pieza_id"],
             material_id=filtros["material_id"],
+            dureza=filtros["dureza"],
         )
     return filtros, registros, calculos.totales(registros)
 
@@ -306,13 +320,16 @@ def _textos_informe(filtros, registros, totales, pieza, material):
         titulo = "Producción: todos los registros"
         subtitulo = f"Pedidos del {primera} al {ultima}"
 
-    if pieza or material:
-        elegido = " · ".join(
-            texto for texto in (pieza and f"Pieza: {pieza}", material and f"Material: {material}")
-            if texto
+    elegidos = [
+        texto
+        for texto in (
+            pieza and f"Pieza: {pieza}",
+            material and f"Material: {material}",
+            _texto_filtro_dureza(filtros["dureza"]),
         )
-    else:
-        elegido = "Todas las piezas y materiales"
+        if texto
+    ]
+    elegido = " · ".join(elegidos) if elegidos else "Todas las piezas y materiales"
     pedidos = totales["pedidos"]
     return {
         "titulo": titulo,
@@ -328,6 +345,10 @@ def _nombre_archivo_pdf(filtros, registros, pieza, material):
     hasta = filtros["hasta"] or registros[0]["fecha"]
     partes = ["produccion", desde, "al", hasta]
     partes += [_para_nombre_de_archivo(nombre) for nombre in (pieza, material) if nombre]
+    if filtros["dureza"] == base_datos.SIN_DUREZA:
+        partes.append("sin-dureza")
+    elif filtros["dureza"] is not None:
+        partes.append(f"shore-a-{filtros['dureza']}")
     nombre = "_".join(partes) + ".pdf"
     return "PRUEBA_" + nombre if current_app.config["MODO_PRUEBA"] else nombre
 
@@ -664,6 +685,8 @@ def _valores_de(registro):
         "fecha": registro["fecha"],
         "pieza_id": str(registro["pieza_id"]),
         "material_id": str(registro["material_id"]),
+        "dureza_shore_a": "" if registro["dureza_shore_a"] is None
+        else str(registro["dureza_shore_a"]),
         "cantidad": str(registro["cantidad"]),
         "material_recibido_g": gramos(registro["material_recibido_g"]),
         "material_sobrante_g": gramos(registro["material_sobrante_g"]),
@@ -695,6 +718,7 @@ def _leer_filtros(args, hoy):
         "hasta": None,
         "pieza_id": _leer_id(args.get("pieza_id")),
         "material_id": _leer_id(args.get("material_id")),
+        "dureza": _leer_dureza(args.get("dureza")),
         "descripcion": "Todas las fechas",
         "error": None,
     }
@@ -727,6 +751,14 @@ def _leer_filtros(args, hoy):
 
 def _leer_id(texto):
     return int(texto) if texto and texto.isdigit() else None
+
+
+def _leer_dureza(texto):
+    """'70' -> 70; 'sin-dato' se deja igual; cualquier otra cosa = todas (None)."""
+    if texto == base_datos.SIN_DUREZA:
+        return texto
+    dureza = _leer_id(texto)
+    return dureza if dureza in crear_base.DUREZAS_SHORE_A else None
 
 
 def _leer_fecha(texto):

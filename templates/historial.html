@@ -48,6 +48,17 @@
     </select>
   </div>
 
+  <div class="campo">
+    <label for="dureza">Dureza (Shore A)</label>
+    <select id="dureza" name="dureza">
+      <option value="">Todas</option>
+      {% for dureza in durezas %}
+        <option value="{{ dureza }}" {% if filtros.dureza == dureza %}selected{% endif %}>{{ dureza }}</option>
+      {% endfor %}
+      <option value="{{ sin_dureza }}" {% if filtros.dureza == sin_dureza %}selected{% endif %}>Sin dato</option>
+    </select>
+  </div>
+
   <div class="acciones-filtro">
     <button type="submit" class="boton">Filtrar</button>
     <a href="{{ url_for('produccion.historial') }}" class="boton boton-secundario">Quitar filtros</a>
@@ -59,6 +70,8 @@
     <strong>{{ filtros.descripcion }}</strong>
     {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre }}{% endfor %}
     {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre }}{% endfor %}
+    {%- if filtros.dureza == sin_dureza %} · sin dureza anotada
+    {%- elif filtros.dureza %} · {{ filtros.dureza }} Shore A{% endif %}
     · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
   </p>
   {# El PDF sale de lo que se ve en pantalla: mismo periodo y mismos filtros #}
@@ -83,6 +96,7 @@
           <th>Fecha</th>
           <th>Pieza</th>
           <th>Material</th>
+          <th class="numero">Dureza (Shore A)</th>
           <th>Lona</th>
           <th class="numero">Cant.</th>
           <th class="numero">Mat. recibido</th>
@@ -105,6 +119,7 @@
             <td class="sin-salto">{{ registro.fecha|fecha }}</td>
             <td>{{ registro.pieza }}</td>
             <td>{{ registro.material }}</td>
+            <td class="numero{% if registro.dureza_shore_a is none %} vacio-celda{% endif %}">{{ registro.dureza_shore_a|dureza }}</td>
             <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
             <td class="numero">{{ registro.cantidad }}</td>
             <td class="numero">{{ registro.material_recibido_g|gramos }}</td>
@@ -127,7 +142,7 @@
       <tfoot>
         <tr>
           <th class="acciones">Total</th>
-          <td colspan="4"></td>
+          <td colspan="5"></td>
           <td class="numero">{{ totales.piezas }}</td>
           <td></td>
           <td></td>

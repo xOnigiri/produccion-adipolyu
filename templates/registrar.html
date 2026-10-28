@@ -88,6 +88,18 @@
   </div>
 
   <div class="campo">
+    <label for="dureza_shore_a">Dureza (Shore A) <span class="opcional">(opcional)</span></label>
+    <select id="dureza_shore_a" name="dureza_shore_a"
+            {% if errores.dureza_shore_a %}class="con-error" aria-invalid="true" aria-describedby="error-dureza_shore_a"{% endif %}>
+      <option value="">— sin dato —</option>
+      {% for dureza in durezas %}
+        <option value="{{ dureza }}" {% if valores.dureza_shore_a == dureza|string %}selected{% endif %}>{{ dureza }}</option>
+      {% endfor %}
+    </select>
+    {{ error("dureza_shore_a") }}
+  </div>
+
+  <div class="campo">
     <label for="cantidad">Cantidad producida (unidades)</label>
     <input type="number" id="cantidad" name="cantidad" required min="1" step="1"
            inputmode="numeric" placeholder="Ej.: 50"

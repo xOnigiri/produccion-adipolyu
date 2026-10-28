@@ -22,6 +22,7 @@
           <th>Fecha</th>
           <th>Pieza</th>
           <th>Material</th>
+          <th class="numero">Dureza (Shore A)</th>
           <th>Lona</th>
           <th class="numero">Cant.</th>
           <th class="numero calculado">Mat. usado</th>
@@ -40,6 +41,7 @@
             <td class="sin-salto">{{ registro.fecha|fecha }}</td>
             <td>{{ registro.pieza }}</td>
             <td>{{ registro.material }}</td>
+            <td class="numero{% if registro.dureza_shore_a is none %} vacio-celda{% endif %}">{{ registro.dureza_shore_a|dureza }}</td>
             <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
             <td class="numero">{{ registro.cantidad }}</td>
             <td class="numero calculado">{{ registro|material_usado|kg }}</td>
