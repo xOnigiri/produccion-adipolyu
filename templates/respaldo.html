@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block titulo %}Respaldo{% endblock %}
+
+{% block contenido %}
+<h1>Respaldo</h1>
+
+{% if destino is none %}
+  <p class="aviso aviso-error" role="alert">
+    El respaldo está desactivado: la app está usando una copia de la base
+    ({{ ruta_db }}). Solo la base real se respalda en Google Drive.
+  </p>
+{% else %}
+  <dl class="datos-respaldo">
+    <dt>Destino</dt>
+    <dd>
+      {{ destino.carpeta }}
+      {% if disponible %}
+        <span class="estado estado-ok">✔ Disponible</span>
+      {% else %}
+        <span class="estado estado-error">✖ No disponible</span>
+      {% endif %}
+    </dd>
+
+    <dt>Último respaldo</dt>
+    <dd>
+      {% if ultimo %}
+        {{ ultimo[0].strftime("%d/%m/%Y %H:%M") }}
+        <span class="detalle-respaldo">{{ ultimo[1] }}</span>
+      {% else %}
+        Todavía no hay respaldos.
+      {% endif %}
+    </dd>
+
+    <dt>Qué se guarda</dt>
+    <dd>
+      {% if modo_prueba %}
+        La base de prueba (datos de ejemplo). Nunca se envía a Google Drive.
+      {% else %}
+        La base de producción completa (también la papelera)
+        {%- if extras %}, más: {{ extras|join(", ") }}{% endif %}.
+      {% endif %}
+    </dd>
+  </dl>
+
+  {% if destino.en_drive and not disponible %}
+    <p class="aviso aviso-error" role="alert">
+      No se encuentra {{ destino.unidad }}. Abre Google Drive para escritorio
+      e inicia sesión antes de hacer el respaldo.
+    </p>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('produccion.exportar_respaldo') }}">
+    <button type="submit" class="boton">Exportar respaldo ahora</button>
+  </form>
+
+  <p class="nota-respaldo">
+    Cada respaldo es una carpeta nueva con la fecha y la hora. Los anteriores
+    nunca se borran ni se reemplazan. Haz un respaldo al menos una vez por semana.
+  </p>
+{% endif %}
+{% endblock %}

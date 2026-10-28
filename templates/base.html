@@ -25,8 +25,17 @@
          {% if pagina in ('produccion.historial', 'produccion.corregir', 'produccion.confirmar_borrado') %}class="activo" aria-current="page"{% endif %}>Historial</a>
       <a href="{{ url_for('produccion.papelera') }}"
          {% if pagina == 'produccion.papelera' %}class="activo" aria-current="page"{% endif %}>Papelera</a>
+      <a href="{{ url_for('produccion.pagina_respaldo') }}"
+         {% if pagina in ('produccion.pagina_respaldo', 'produccion.exportar_respaldo') %}class="activo" aria-current="page"{% endif %}>Respaldo</a>
     </nav>
   </header>
+
+  {% if aviso_respaldo %}
+    <div class="franja-respaldo" role="note">
+      {{ aviso_respaldo }} Haz un respaldo al menos una vez por semana.
+      <a href="{{ url_for('produccion.pagina_respaldo') }}">Hacer respaldo ahora</a>
+    </div>
+  {% endif %}
 
   <main class="contenido {% block ancho %}{% endblock %}">
     {% with mensajes = get_flashed_messages(with_categories=true) %}

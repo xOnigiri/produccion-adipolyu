@@ -15,6 +15,9 @@
   --prueba-fondo: #fff3c4;
   --prueba-texto: #7a4f01;
   --calculado-fondo: #eef3fa;
+  --respaldo-fondo: #ffe0b2;
+  --respaldo-texto: #8a3b00;
+  --respaldo-borde: #e65100;
 }
 
 * {
@@ -53,7 +56,7 @@ body {
   opacity: 0.85;
 }
 
-/* Menú: Registrar · Historial · Papelera */
+/* Menú: Registrar · Historial · Papelera · Respaldo */
 .menu {
   display: flex;
   gap: 4px;
@@ -126,6 +129,69 @@ h1 {
 .aviso-error {
   background: var(--error-fondo);
   color: var(--error-texto);
+}
+
+.aviso-advertencia {
+  background: var(--prueba-fondo);
+  color: var(--prueba-texto);
+}
+
+/* Aviso de 7 días sin respaldo, debajo del menú */
+.franja-respaldo {
+  padding: 8px 16px;
+  background: var(--respaldo-fondo);
+  color: var(--respaldo-texto);
+  border-bottom: 2px solid var(--respaldo-borde);
+  font-weight: 600;
+  text-align: center;
+}
+
+.franja-respaldo a {
+  color: inherit;
+  font-weight: 700;
+}
+
+/* Página de respaldo */
+.datos-respaldo {
+  margin: 0 0 20px;
+  padding: 16px;
+  background: var(--tarjeta);
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+
+.datos-respaldo dt {
+  font-weight: 700;
+}
+
+.datos-respaldo dd {
+  margin: 2px 0 12px;
+  overflow-wrap: anywhere;
+}
+
+.datos-respaldo dd:last-child {
+  margin-bottom: 0;
+}
+
+.estado {
+  display: inline-block;
+  margin-left: 6px;
+  font-weight: 700;
+}
+
+.estado-ok {
+  color: var(--exito-texto);
+}
+
+.estado-error {
+  color: var(--error-texto);
+}
+
+.detalle-respaldo,
+.nota-respaldo {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.92rem;
 }
 
 /* Formulario */

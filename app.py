@@ -38,6 +38,7 @@ import calculos
 import datos_prueba
 import formato
 import informe_pdf
+import respaldo
 from validacion import validar_registro
 
 # 127.0.0.1 = solo esta laptop; nadie más en la red puede abrir la app
@@ -64,6 +65,12 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
     app.config["RUTA_DB"] = ruta_db or base_datos.ruta_base()
     app.config["MODO_PRUEBA"] = modo_prueba
     app.config["RUTA_LOGO"] = ruta_logo
+    # A dónde va el respaldo según la base: Drive (real), práctica (modo prueba) o ninguno
+    (
+        app.config["DESTINO_RESPALDO"],
+        app.config["ESTADO_RESPALDO"],
+        app.config["LISTA_EXTRA_RESPALDO"],
+    ) = respaldo.configuracion(app.config["RUTA_DB"], modo_prueba)
     # Firma los mensajes de "registro guardado"; se renueva en cada arranque
     app.secret_key = secrets.token_hex(16)
 
@@ -84,6 +91,7 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
         gramos_por_pieza=calculos.gramos_por_pieza,
     )
     app.context_processor(lambda: {"modo_prueba": app.config["MODO_PRUEBA"]})
+    app.context_processor(_aviso_respaldo)
     return app
 
 
@@ -366,6 +374,84 @@ def restaurar(registro_id):
             "exito",
         )
     return redirect(url_for(".papelera"))
+
+
+@rutas.get("/respaldo")
+def pagina_respaldo():
+    destino = current_app.config["DESTINO_RESPALDO"]
+    estado = current_app.config["ESTADO_RESPALDO"]
+    return render_template(
+        "respaldo.html",
+        destino=destino,
+        # Solo se mira si la carpeta existe; abrir la página no escribe nada
+        disponible=destino is not None and destino.unidad.is_dir(),
+        ultimo=respaldo.ultimo_respaldo(estado) if estado else None,
+        extras=[ruta.name for ruta in respaldo.leer_extras(
+            current_app.config["LISTA_EXTRA_RESPALDO"])],
+        ruta_db=current_app.config["RUTA_DB"],
+    )
+
+
+@rutas.post("/respaldo")
+def exportar_respaldo():
+    destino = current_app.config["DESTINO_RESPALDO"]
+    if destino is None:
+        flash("El respaldo está desactivado porque la app está usando una copia de la base.",
+              "error")
+        return redirect(url_for(".pagina_respaldo"))
+
+    try:
+        resultado = respaldo.hacer_respaldo(
+            current_app.config["RUTA_DB"],
+            destino,
+            respaldo.leer_extras(current_app.config["LISTA_EXTRA_RESPALDO"]),
+        )
+    except respaldo.RespaldoFallido as error:
+        current_app.logger.warning("Respaldo no realizado: %s", error)
+        flash(str(error), "error")
+        return redirect(url_for(".pagina_respaldo"))
+
+    conteo = resultado.conteo
+    extras = f" · también: {', '.join(resultado.extras)}" if resultado.extras else ""
+    flash(
+        f"Respaldo verificado en {resultado.carpeta} · {conteo['registros']} "
+        f"{'registro' if conteo['registros'] == 1 else 'registros'} "
+        f"({conteo['en_papelera']} en la papelera) · lista de {conteo['piezas']} piezas "
+        f"y {conteo['materiales']} materiales{extras}.",
+        "exito",
+    )
+    if destino.en_drive:
+        flash("Google Drive lo subirá a la nube en unos minutos: espera a que el icono de "
+              "Drive termine antes de apagar la laptop.", "exito")
+    else:
+        flash("MODO PRUEBA: respaldo de práctica guardado en la laptop; "
+              "no se envió a Google Drive.", "advertencia")
+    if resultado.extras_faltantes:
+        flash("No se encontraron estos archivos, así que no se respaldaron: "
+              + ", ".join(resultado.extras_faltantes) + ". La base sí se respaldó.",
+              "advertencia")
+
+    try:
+        respaldo.anotar_respaldo(current_app.config["ESTADO_RESPALDO"], resultado)
+    except OSError as error:
+        flash(f"El respaldo está bien, pero no se pudo anotar su fecha ({error}). "
+              "El aviso de 7 días podría seguir apareciendo.", "advertencia")
+    return redirect(url_for(".pagina_respaldo"))
+
+
+def _aviso_respaldo():
+    """Franja en todas las páginas si pasaron 7 días o más sin respaldo (o nunca hubo)."""
+    estado = current_app.config["ESTADO_RESPALDO"]
+    if estado is None or request.endpoint in ("produccion.pagina_respaldo",
+                                              "produccion.exportar_respaldo"):
+        return {"aviso_respaldo": None}
+    ultimo = respaldo.ultimo_respaldo(estado)
+    if ultimo is None:
+        return {"aviso_respaldo": "Todavía no hay ningún respaldo."}
+    dias = (date.today() - ultimo[0].date()).days
+    if dias < respaldo.DIAS_AVISO:
+        return {"aviso_respaldo": None}
+    return {"aviso_respaldo": f"Último respaldo: hace {dias} días."}
 
 
 def _registro_vigente(registro_id):
