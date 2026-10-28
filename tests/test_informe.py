@@ -45,7 +45,7 @@ class ConInforme(ConHistorial):
         return respuesta
 
     def semana_de_ejemplo(self):
-        """Lona de la semana: 525 g + 220 g usados = 0.75 kg; sobrante 75 + 30 g."""
+        """Lona de la semana: 525 g + 220 g usados = 0,75 kg; sobrante 75 + 30 g."""
         self.insertar(LUNES, material="jebe azul", pieza="amortiguador", cantidad=20,
                       recibido=5200, sobrante=480, lona=(600, 75))
         self.insertar(LUNES, observaciones="2 piezas con burbuja")
@@ -68,13 +68,13 @@ class DescargarPdfTest(ConInforme):
         historial = self.html("/historial")
         texto = texto_del_pdf(self.pdf().data)
         # Recuadro de arriba: piezas, material usado y lona usada
-        for cifra in ("190", "9.77 kg", "0.75 kg"):
+        for cifra in ("190", "9,77", "0,75"):
             self.assertIn(cifra, historial)
             self.assertIn(cifra, texto)
         # Filas (sin la unidad, que va en el título de la columna) y resúmenes
-        for cifra in ("3600.5", "3.20", "64", "0.53", "0.22", "4.72", "1.85", "0.11"):
+        for cifra in ("3600,5", "3,20", "64", "0,53", "0,22", "4,72", "1,85", "0,11"):
             self.assertIn(cifra, texto)
-        self.assertNotIn("0.74", texto)
+        self.assertNotIn("0,74", texto)
         self.assertIn("Producción de la semana", texto)
         self.assertIn("burbuja", texto)
 
@@ -129,8 +129,8 @@ class DescargarPdfTest(ConInforme):
     def test_historial_muestra_la_linea_de_lona(self):
         self.semana_de_ejemplo()
         html = " ".join(self.html("/historial").split())
-        self.assertIn('<tr class="fila-lona"> <td>Lona</td> <td class="numero">0.75 kg</td> '
-                      '<td class="numero">0.11 kg</td>', html)
+        self.assertIn('<tr class="fila-lona"> <td>Lona</td> <td class="numero">0,75 kg</td> '
+                      '<td class="numero">0,11 kg</td>', html)
 
 
 class LogoYModoPruebaTest(ConInforme):
@@ -181,13 +181,13 @@ class InformeSinWebTest(unittest.TestCase):
         filas = informe_pdf.filas_de_pedidos(registros, calculos.totales(registros))
         self.assertEqual(
             filas[0],
-            ["22/10/2026", "retén", "nitrilo", "70", "No", "50", "3600.5", "400", "3.20", "64",
+            ["22/10/2026", "Retén", "Nitrilo", "70", "No", "50", "3600,5", "400", "3,20", "64",
              "—", ""],
         )
         self.assertEqual(len(filas[0]), len(informe_pdf.COLUMNAS))
         self.assertEqual(len(filas[-1]), len(informe_pdf.COLUMNAS))
         self.assertEqual(filas[-1][0], "TOTAL")
-        self.assertEqual(filas[-1][8], "3.20")
+        self.assertEqual(filas[-1][8], "3,20")
 
     def test_sin_dureza_muestra_guion(self):
         registros = [{

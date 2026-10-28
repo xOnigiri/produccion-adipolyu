@@ -46,7 +46,7 @@ class NombresTest(unittest.TestCase):
 
     def test_repetido_inactivo_se_informa(self):
         _, error, repetido = validar_nombre("Jebe  Azul", self.LISTA)
-        self.assertEqual(error, "Ya existe «jebe azul».")
+        self.assertEqual(error, "Ya existe <strong>Jebe azul</strong>.")
         self.assertEqual(repetido["id"], 3)
 
     def test_nuevo_valido(self):
@@ -67,7 +67,7 @@ class NombresTest(unittest.TestCase):
     def test_corregir_al_nombre_de_otro_se_rechaza(self):
         nombre, error, repetido = validar_nombre("Retén", self.LISTA, propio=self.LISTA[1])
         self.assertIsNone(nombre)
-        self.assertEqual(error, "Ya existe «retén».")
+        self.assertEqual(error, "Ya existe <strong>Retén</strong>.")
         self.assertEqual(repetido["id"], 1)
 
     def test_corregir_al_mismo_nombre_no_hace_nada(self):
@@ -121,13 +121,15 @@ class PaginaListasTest(ConListas):
         self.assertIn("· 7 activos", html)
         self.assertIn("+1 en papelera", html)
         # La pieza desactivada sale en gris, con su estado y el botón para reactivarla
-        self.assertIn('<tr class="fila-inactiva">\n              <td>pieza retirada</td>', html)
+        self.assertIn('<tr class="fila-inactiva">\n              <td>Pieza retirada</td>', html)
+        self.assertIn('<span class="pastilla pastilla-apagada">Inactiva</span>', html)
+        self.assertIn('<span class="pastilla pastilla-verde">Activa</span>', html)
         self.assertIn(f"/listas/piezas/{self.piezas['pieza retirada']}/reactivar", html)
 
     def test_el_menu_lleva_a_listas(self):
         html = self.html("/registrar")
         self.assertIn('href="/listas"', html)
-        self.assertIn('class="activo" aria-current="page">Listas', self.html("/listas"))
+        self.assertEqual(self.opcion_resaltada(self.html("/listas")), ["Listas"])
 
     def test_lista_desconocida(self):
         self.assertEqual(self.cliente.post("/listas/clientes/agregar").status_code, 404)
@@ -138,17 +140,17 @@ class AgregarTest(ConListas):
         respuesta = self.cliente.post("/listas/piezas/agregar", data={"nombre": "  Buje   GRANDE "})
         self.assertEqual(respuesta.status_code, 302)
         # El aviso verde sale en la página siguiente
-        self.assertIn("Se agregó la pieza «buje grande»", self.html("/listas"))
+        self.assertIn("Se agregó la pieza <strong>Buje grande</strong>.", self.html("/listas"))
         fila = self.consultar("SELECT * FROM piezas WHERE nombre = 'buje grande'")[0]
         self.assertEqual(fila["activo"], 1)
-        self.assertIn(f'<option value="{fila["id"]}" >buje grande</option>',
+        self.assertIn(f'<option value="{fila["id"]}" >Buje grande</option>',
                       self.opciones_del_formulario())
 
     def test_agregar_material(self):
         self.cliente.post("/listas/materiales/agregar", data={"nombre": "Jebe Negro"})
         self.assertEqual(len(self.consultar(
             "SELECT * FROM materiales WHERE nombre = 'jebe negro'")), 1)
-        self.assertIn("Se agregó el material «jebe negro»", self.html("/listas"))
+        self.assertIn("Se agregó el material <strong>Jebe negro</strong>.", self.html("/listas"))
 
     def test_agregar_duplicado_no_guarda_nada(self):
         antes = self.total_filas()
@@ -156,7 +158,7 @@ class AgregarTest(ConListas):
             with self.subTest(escrito=escrito):
                 respuesta = self.cliente.post("/listas/piezas/agregar", data={"nombre": escrito})
                 self.assertEqual(respuesta.status_code, 422)
-                self.assertIn("Ya existe «", respuesta.get_data(as_text=True))
+                self.assertIn("Ya existe <strong>", respuesta.get_data(as_text=True))
         self.assertEqual(self.total_filas(), antes)
 
     def test_agregar_duplicado_de_un_inactivo_ofrece_reactivarlo(self):
@@ -164,7 +166,7 @@ class AgregarTest(ConListas):
         html = respuesta.get_data(as_text=True)
         self.assertEqual(respuesta.status_code, 422)
         self.assertIn("Está inactiva.", html)
-        self.assertIn("Reactivar «pieza retirada»", html)
+        self.assertIn("Reactivar <strong>Pieza retirada</strong>", html)
         # Lo escrito se conserva en la casilla
         self.assertIn('value="Pieza Retirada"', html)
 
@@ -187,7 +189,7 @@ class CorregirNombreTest(ConListas):
         )
         html = respuesta.get_data(as_text=True)
         self.assertEqual(respuesta.status_code, 200)
-        self.assertIn("«retén» → «retén grande»", html)
+        self.assertIn("<strong>Retén</strong> → <strong>Retén grande</strong>", html)
         self.assertIn("Afecta a <strong>3 registros (y 1 en la papelera)</strong>", html)
         self.assertIn('name="paso" value="confirmar"', html)
         # Todavía no cambió nada
@@ -201,12 +203,13 @@ class CorregirNombreTest(ConListas):
             data={"nombre": "retén grande", "paso": "confirmar"},
         )
         self.assertEqual(respuesta.status_code, 302)
-        self.assertIn("Nombre corregido: «retén» → «retén grande». Ya se ve así en 1 registro.",
+        self.assertIn("Nombre corregido: <strong>Retén</strong> → <strong>Retén grande</strong>. "
+                      "Ya se ve así en 1 registro.",
                       self.html("/listas"))
         self.assertEqual(self.pieza(id_reten)["nombre"], "retén grande")
         # El registro sigue apuntando a la misma pieza: no se reescribió
         self.assertEqual(self.fila(registro_id)["pieza_id"], id_reten)
-        self.assertIn("<td>retén grande</td>", self.html("/historial"))
+        self.assertIn("<td>Retén grande</td>", self.html("/historial"))
 
     def test_corregir_solo_la_tilde_reten_a_reten_con_tilde(self):
         # Una pieza escrita sin tilde por error
@@ -218,7 +221,8 @@ class CorregirNombreTest(ConListas):
             f"/listas/piezas/{id_reten}/nombre", data={"nombre": "Retén", "paso": "revisar"}
         )
         self.assertEqual(revisar.status_code, 200)
-        self.assertIn("«reten» → «retén»", revisar.get_data(as_text=True))
+        self.assertIn("<strong>Reten</strong> → <strong>Retén</strong>",
+                      revisar.get_data(as_text=True))
 
         confirmar = self.cliente.post(
             f"/listas/piezas/{id_reten}/nombre", data={"nombre": "retén", "paso": "confirmar"}
@@ -234,12 +238,12 @@ class CorregirNombreTest(ConListas):
                     f"/listas/piezas/{id_soporte}/nombre", data={"nombre": "RETEN", "paso": paso}
                 )
                 self.assertEqual(respuesta.status_code, 422)
-                self.assertIn("Ya existe «retén».", respuesta.get_data(as_text=True))
+                self.assertIn("Ya existe <strong>Retén</strong>.", respuesta.get_data(as_text=True))
         self.assertEqual(self.pieza(id_soporte)["nombre"], "soporte")
 
     def test_corregir_muestra_el_nombre_actual(self):
         html = self.html(f"/listas/materiales/{self.materiales['nitrilo']}/nombre")
-        self.assertIn("Nombre actual: <strong>«nitrilo»</strong> · usado en ningún registro.", html)
+        self.assertIn("Nombre actual: <strong>Nitrilo</strong> · usado en ningún registro.", html)
 
     def test_corregir_algo_que_no_existe(self):
         respuesta = self.cliente.get("/listas/piezas/999/nombre", follow_redirects=True)
@@ -254,23 +258,23 @@ class ActivarDesactivarTest(ConListas):
         self.cliente.post(f"/listas/piezas/{id_reten}/desactivar")
         self.assertIn("Sus registros (1 registro) siguen en el historial", self.html("/listas"))
         self.assertEqual(self.pieza(id_reten)["activo"], 0)
-        self.assertNotIn(">retén</option>", self.opciones_del_formulario())
+        self.assertNotIn(">Retén</option>", self.opciones_del_formulario())
 
         historial = self.html("/historial")
-        self.assertIn("<td>retén</td>", historial)
-        self.assertIn(">retén (inactiva)</option>", historial)
+        self.assertIn("<td>Retén</td>", historial)
+        self.assertIn(">Retén (inactiva)</option>", historial)
         # Filtrar por la pieza inactiva y sacar su PDF sigue funcionando
-        self.assertIn("<td>retén</td>", self.html(f"/historial?pieza_id={id_reten}"))
+        self.assertIn("<td>Retén</td>", self.html(f"/historial?pieza_id={id_reten}"))
         pdf = self.cliente.get(f"/historial/pdf?pieza_id={id_reten}")
         self.assertEqual(pdf.mimetype, "application/pdf")
         # Al corregir un registro antiguo, su pieza sigue en la lista
-        self.assertIn(">retén</option>", self.html(f"/registro/{registro_id}/corregir"))
+        self.assertIn(">Retén</option>", self.html(f"/registro/{registro_id}/corregir"))
 
     def test_reactivar_lo_devuelve_al_formulario(self):
         id_retirada = self.piezas["pieza retirada"]
         self.cliente.post(f"/listas/piezas/{id_retirada}/reactivar")
         self.assertEqual(self.pieza(id_retirada)["activo"], 1)
-        self.assertIn(">pieza retirada</option>", self.opciones_del_formulario())
+        self.assertIn(">Pieza retirada</option>", self.opciones_del_formulario())
 
     def test_no_se_desactiva_el_ultimo_material_activo(self):
         id_nitrilo = self.materiales["nitrilo"]

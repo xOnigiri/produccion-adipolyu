@@ -4,6 +4,7 @@ Cada prueba usa una base nueva en una carpeta temporal, armada con las mismas
 tablas y listas de crear_base.py. Nunca abre produccion.db.
 """
 
+import re
 import sqlite3
 import tempfile
 import unittest
@@ -56,6 +57,14 @@ class PruebaConBase(unittest.TestCase):
         finally:
             conexion.close()
 
+    def opcion_resaltada(self, html):
+        """Nombres de las opciones del menú resaltadas (debe haber una sola).
+        Entre el enlace y el nombre va el icono."""
+        return re.findall(
+            r'class="activo" aria-current="page">\s*<svg.*?</svg>\s*<span>([^<]+)</span>',
+            html, re.S,
+        )
+
 
 class FormularioTest(PruebaConBase):
     def setUp(self):
@@ -95,9 +104,10 @@ class FormularioTest(PruebaConBase):
 
     def test_formulario_muestra_listas_activas_y_fecha_de_hoy(self):
         html = self.cliente.get("/registrar").get_data(as_text=True)
-        self.assertIn("retén", html)
-        self.assertIn("silicona transparente", html)
-        self.assertNotIn("pieza retirada", html)
+        # Con mayúscula inicial al mostrarlos, aunque se guarden en minúsculas
+        self.assertIn(">Retén</option>", html)
+        self.assertIn(">Silicona transparente</option>", html)
+        self.assertNotIn("Pieza retirada", html)
         self.assertIn(f'value="{date.today().isoformat()}"', html)
 
     def test_guardar_pedido_valido(self):
@@ -114,8 +124,8 @@ class FormularioTest(PruebaConBase):
 
         html = self.cliente.get(respuesta.headers["Location"]).get_data(as_text=True)
         self.assertIn(
-            "Registro guardado: 22/10/2026 · retén · nitrilo · con lona · 50 unidades · "
-            "material usado 3.20 kg · lona usada 0.22 kg",
+            "Registro guardado: 22/10/2026 · Retén · Nitrilo · con lona · 50 unidades · "
+            "material usado 3,20 kg · lona usada 0,22 kg",
             html,
         )
         self.assertIn('value="2026-10-22"', html)
@@ -133,7 +143,7 @@ class FormularioTest(PruebaConBase):
 
         html = respuesta.get_data(as_text=True)
         self.assertIn("No se guardó el registro", html)
-        self.assertIn("no puede ser mayor que el recibido (3600.5 g)", html)
+        self.assertIn("no puede ser mayor que el recibido (3600,5 g)", html)
         self.assertIn('value="3600,5"', html)
         self.assertIn("2 piezas con burbuja", html)
         self.assertIn("checked", html)

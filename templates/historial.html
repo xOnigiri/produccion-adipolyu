@@ -1,10 +1,20 @@
 {% extends "base.html" %}
+{% from "_cifras.html" import tarjetas %}
+{% from "_iconos.html" import icono %}
 
 {% block titulo %}Historial{% endblock %}
 {% block ancho %}contenido-ancho{% endblock %}
 
 {% block contenido %}
-<h1>Historial</h1>
+<div class="cabecera-pagina">
+  <h1>Historial</h1>
+  {# El PDF sale de lo que se ve en pantalla: mismo periodo y mismos filtros #}
+  {% if registros %}
+    <a href="{{ url_pdf }}" class="boton boton-pdf">Descargar PDF</a>
+  {% else %}
+    <span class="boton boton-pdf boton-apagado" aria-disabled="true">No hay registros para el informe</span>
+  {% endif %}
+</div>
 
 <form method="get" action="{{ url_for('produccion.historial') }}" class="filtros">
   <div class="campo">
@@ -16,13 +26,15 @@
     </select>
   </div>
 
-  {# historial.js muestra estas fechas solo con "Elegir fechas" #}
-  <div class="campo campo-rango">
+  {# Solo con "Elegir fechas". Llegan ya ocultos desde aquí (así no parpadean al
+     abrir la página); historial.js los muestra u oculta al cambiar el periodo. #}
+  {% set sin_rango = filtros.periodo != "rango" %}
+  <div class="campo campo-rango" {% if sin_rango %}hidden{% endif %}>
     <label for="desde">Desde</label>
     <input type="date" id="desde" name="desde" max="{{ hoy }}"
            value="{{ filtros.desde if filtros.periodo == 'rango' and filtros.desde else '' }}">
   </div>
-  <div class="campo campo-rango">
+  <div class="campo campo-rango" {% if sin_rango %}hidden{% endif %}>
     <label for="hasta">Hasta</label>
     <input type="date" id="hasta" name="hasta" max="{{ hoy }}"
            value="{{ filtros.hasta if filtros.periodo == 'rango' and filtros.hasta else '' }}">
@@ -33,7 +45,7 @@
     <select id="pieza_id" name="pieza_id">
       <option value="">Todas</option>
       {% for pieza in piezas %}
-        <option value="{{ pieza.id }}" {% if filtros.pieza_id == pieza.id %}selected{% endif %}>{{ pieza.nombre }}{% if not pieza.activo %} (inactiva){% endif %}</option>
+        <option value="{{ pieza.id }}" {% if filtros.pieza_id == pieza.id %}selected{% endif %}>{{ pieza.nombre|nombre }}{% if not pieza.activo %} (inactiva){% endif %}</option>
       {% endfor %}
     </select>
   </div>
@@ -43,13 +55,13 @@
     <select id="material_id" name="material_id">
       <option value="">Todos</option>
       {% for material in materiales %}
-        <option value="{{ material.id }}" {% if filtros.material_id == material.id %}selected{% endif %}>{{ material.nombre }}{% if not material.activo %} (inactivo){% endif %}</option>
+        <option value="{{ material.id }}" {% if filtros.material_id == material.id %}selected{% endif %}>{{ material.nombre|nombre }}{% if not material.activo %} (inactivo){% endif %}</option>
       {% endfor %}
     </select>
   </div>
 
   <div class="campo">
-    <label for="dureza">Dureza (Shore A)</label>
+    <label for="dureza">Dureza</label>
     <select id="dureza" name="dureza">
       <option value="">Todas</option>
       {% for dureza in durezas %}
@@ -65,22 +77,18 @@
   </div>
 </form>
 
-<div class="barra-periodo">
-  <p class="periodo-elegido">
-    <strong>{{ filtros.descripcion }}</strong>
-    {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre }}{% endfor %}
-    {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre }}{% endfor %}
-    {%- if filtros.dureza == sin_dureza %} · sin dureza anotada
-    {%- elif filtros.dureza %} · {{ filtros.dureza }} Shore A{% endif %}
-    · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
-  </p>
-  {# El PDF sale de lo que se ve en pantalla: mismo periodo y mismos filtros #}
-  {% if registros %}
-    <a href="{{ url_pdf }}" class="boton boton-pdf">Descargar PDF</a>
-  {% else %}
-    <span class="boton boton-pdf boton-apagado" aria-disabled="true">No hay registros para el informe</span>
-  {% endif %}
-</div>
+<p class="periodo-elegido">
+  <strong>{{ filtros.descripcion }}</strong>
+  {%- for pieza in piezas if pieza.id == filtros.pieza_id %} · {{ pieza.nombre|nombre }}{% endfor %}
+  {%- for material in materiales if material.id == filtros.material_id %} · {{ material.nombre|nombre }}{% endfor %}
+  {%- if filtros.dureza == sin_dureza %} · sin dureza anotada
+  {%- elif filtros.dureza %} · Dureza {{ filtros.dureza }}{% endif %}
+  · {{ totales.pedidos }} {{ "pedido" if totales.pedidos == 1 else "pedidos" }}
+</p>
+
+{% if not filtros.error %}
+  {{ tarjetas(totales, comparacion) }}
+{% endif %}
 
 {% if filtros.error %}
   <p class="aviso aviso-error" role="alert">{{ filtros.error }}</p>
@@ -96,7 +104,7 @@
           <th>Fecha</th>
           <th>Pieza</th>
           <th>Material</th>
-          <th class="numero">Dureza (Shore A)</th>
+          <th class="numero">Dureza</th>
           <th>Lona</th>
           <th class="numero">Cant.</th>
           <th class="numero">Mat. recibido</th>
@@ -112,15 +120,31 @@
       <tbody>
         {% for registro in registros %}
           <tr>
+            {# Botones de icono: el nombre sale al pasar el mouse (title) y lo leen los lectores de pantalla #}
             <td class="acciones">
-              <a href="{{ url_for('produccion.corregir', registro_id=registro.id, volver=aqui) }}">Corregir</a>
-              <a href="{{ url_for('produccion.confirmar_borrado', registro_id=registro.id, volver=aqui) }}" class="enlace-borrar">Borrar</a>
+              <a href="{{ url_for('produccion.corregir', registro_id=registro.id, volver=aqui) }}"
+                 class="boton-icono" title="Corregir">
+                {{- icono("corregir") -}}
+                <span class="solo-lector">Corregir el pedido del {{ registro.fecha|fecha }}</span>
+              </a>
+              <a href="{{ url_for('produccion.confirmar_borrado', registro_id=registro.id, volver=aqui) }}"
+                 class="boton-icono boton-icono-borrar" title="Borrar">
+                {{- icono("papelera") -}}
+                <span class="solo-lector">Borrar el pedido del {{ registro.fecha|fecha }}</span>
+              </a>
             </td>
             <td class="sin-salto">{{ registro.fecha|fecha }}</td>
-            <td>{{ registro.pieza }}</td>
-            <td>{{ registro.material }}</td>
-            <td class="numero{% if registro.dureza_shore_a is none %} vacio-celda{% endif %}">{{ registro.dureza_shore_a|dureza }}</td>
-            <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
+            <td>{{ registro.pieza|nombre }}</td>
+            <td>{{ registro.material|nombre }}</td>
+            {% if registro.dureza_shore_a is none %}
+              <td class="numero vacio-celda">—</td>
+            {% else %}
+              <td class="numero"><span class="pastilla pastilla-gris">{{ registro.dureza_shore_a }}</span></td>
+            {% endif %}
+            <td>
+              {% if registro.lleva_lona %}<span class="pastilla pastilla-naranja">Con lona</span>
+              {% else %}<span class="pastilla pastilla-gris">Sin lona</span>{% endif %}
+            </td>
             <td class="numero">{{ registro.cantidad }}</td>
             <td class="numero">{{ registro.material_recibido_g|gramos }}</td>
             <td class="numero">{{ registro.material_sobrante_g|gramos }}</td>
@@ -167,7 +191,7 @@
         <tbody>
           {% for fila in totales.por_material %}
             <tr>
-              <td>{{ fila.material }}</td>
+              <td>{{ fila.material|nombre }}</td>
               <td class="numero">{{ fila.usado_g|kg }}</td>
               <td class="numero">{{ fila.sobrante_g|kg }}</td>
             </tr>
@@ -192,7 +216,7 @@
         <tbody>
           {% for fila in totales.por_pieza %}
             <tr>
-              <td>{{ fila.pieza }}</td>
+              <td>{{ fila.pieza|nombre }}</td>
               <td class="numero">{{ fila.cantidad }}</td>
             </tr>
           {% endfor %}

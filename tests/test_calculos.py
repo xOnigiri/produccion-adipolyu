@@ -47,7 +47,7 @@ class CalculosPorRegistroTest(unittest.TestCase):
     def test_gramos_por_pieza(self):
         self.assertAlmostEqual(gramos_por_pieza(registro()), 64.01)
         self.assertEqual(texto_g_por_pieza(gramos_por_pieza(registro())), "64 g")
-        self.assertEqual(texto_g_por_pieza(1850 / 120), "15.4 g")
+        self.assertEqual(texto_g_por_pieza(1850 / 120), "15,4 g")
 
 
 class SemanaTest(unittest.TestCase):
@@ -97,7 +97,7 @@ class TotalesTest(unittest.TestCase):
         self.assertTrue(resultado["con_lona"])
         self.assertEqual(resultado["lona_usada_g"], 745)
         self.assertEqual(resultado["lona_sobrante_g"], 105)
-        self.assertEqual(texto_kg(resultado["lona_sobrante_g"]), "0.11 kg")
+        self.assertEqual(texto_kg(resultado["lona_sobrante_g"]), "0,11 kg")
         self.assertFalse(totales([registro(**SIN_LONA)])["con_lona"])
 
     def test_sin_registros(self):
@@ -117,13 +117,13 @@ class RedondeoTest(unittest.TestCase):
 
     def test_kg_terminados_en_5_suben(self):
         casos = {
-            745: "0.75 kg",  # la computadora lo guarda como 0.74499999…
-            525: "0.53 kg",
-            125: "0.13 kg",  # Python lo llevaría al par: 0.12
-            5: "0.01 kg",
-            3200.5: "3.20 kg",
-            220: "0.22 kg",
-            0: "0.00 kg",
+            745: "0,75 kg",  # la computadora lo guarda como 0.74499999…
+            525: "0,53 kg",
+            125: "0,13 kg",  # Python lo llevaría al par: 0.12
+            5: "0,01 kg",
+            3200.5: "3,20 kg",
+            220: "0,22 kg",
+            0: "0,00 kg",
         }
         for gramos, esperado in casos.items():
             with self.subTest(gramos=gramos):
@@ -135,28 +135,28 @@ class RedondeoTest(unittest.TestCase):
             registro(lona_recibida_g=600, lona_sobrante_g=75),
             registro(lona_recibida_g=250, lona_sobrante_g=30),
         ]
-        self.assertEqual([texto_kg(lona_usada_g(fila)) for fila in filas], ["0.53 kg", "0.22 kg"])
-        self.assertEqual(texto_kg(totales(filas)["lona_usada_g"]), "0.75 kg")
+        self.assertEqual([texto_kg(lona_usada_g(fila)) for fila in filas], ["0,53 kg", "0,22 kg"])
+        self.assertEqual(texto_kg(totales(filas)["lona_usada_g"]), "0,75 kg")
 
     def test_sumas_con_ruido_de_la_computadora(self):
         # 0.1 + 0.2 da 0.30000000000000004 en la computadora
-        self.assertEqual(texto_kg((0.1 + 0.2) * 1000), "0.30 kg")
+        self.assertEqual(texto_kg((0.1 + 0.2) * 1000), "0,30 kg")
         # 1234.4 + 1.1 da 1235.4999999999998; debe tratarse como 1235.5
-        self.assertEqual(texto_kg(1234.4 + 1.1), "1.24 kg")
-        self.assertEqual(texto_gramos(1234.4 + 1.1), "1235.5")
+        self.assertEqual(texto_kg(1234.4 + 1.1), "1,24 kg")
+        self.assertEqual(texto_gramos(1234.4 + 1.1), "1235,5")
 
     def test_gramos_y_g_por_pieza(self):
-        self.assertEqual(texto_gramos(3600.5), "3600.5")
+        self.assertEqual(texto_gramos(3600.5), "3600,5")
         self.assertEqual(texto_gramos(400.0), "400")
-        self.assertEqual(texto_gramos(3600.125), "3600.13")
-        self.assertEqual(texto_g_por_pieza(15.45), "15.5 g")
-        self.assertEqual(texto_g_por_pieza(0.25), "0.3 g")
+        self.assertEqual(texto_gramos(3600.125), "3600,13")
+        self.assertEqual(texto_g_por_pieza(15.45), "15,5 g")
+        self.assertEqual(texto_g_por_pieza(0.25), "0,3 g")
         self.assertEqual(texto_g_por_pieza(64.01), "64 g")
 
     def test_numeros_sin_unidad_para_el_pdf(self):
-        self.assertEqual(numero_kg(745), "0.75")
-        self.assertEqual(numero_kg(3200.5), "3.20")
-        self.assertEqual(numero_g_por_pieza(15.45), "15.5")
+        self.assertEqual(numero_kg(745), "0,75")
+        self.assertEqual(numero_kg(3200.5), "3,20")
+        self.assertEqual(numero_g_por_pieza(15.45), "15,5")
         self.assertEqual(numero_g_por_pieza(64.01), "64")
 
     def test_redondear(self):

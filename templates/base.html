@@ -4,51 +4,110 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% if modo_prueba %}[PRUEBA] {% endif %}{% block titulo %}{% endblock %} · Producción Adipolyu</title>
+  {# El hexágono del logo, recortado en static/icono.png #}
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icono.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+  {# Antes de dibujar la página: con JavaScript, el menú del celular empieza cerrado
+     (sin esto se veía abierto un instante). Sin JavaScript queda siempre a la vista. #}
+  <script>document.documentElement.classList.add("con-js");</script>
+  {# Precarga (Chrome y Edge): al dejar el mouse sobre una opción del menú, el navegador
+     pide esa página por adelantado y el clic la abre al instante. Solo los enlaces del
+     menú, que únicamente muestran datos; nunca formularios ni botones que cambian algo.
+     Es "prefetch" (solo trae la página, no la ejecuta). Los demás navegadores lo ignoran. #}
+  <script type="speculationrules">
+    {
+      "prefetch": [{
+        "where": {"and": [
+          {"selector_matches": "#menu a[href]"},
+          {"not": {"selector_matches": "#menu a.activo"}}
+        ]},
+        "eagerness": "moderate"
+      }]
+    }
+  </script>
 </head>
 <body>
-  {% if modo_prueba %}
-    <div class="franja-prueba" role="note">
-      MODO PRUEBA · Datos de ejemplo. Nada de lo que hagas aquí cambia los registros reales del taller.
+  {% from "_iconos.html" import icono %}
+
+  {# El enlace de la página abierta se resalta #}
+  {% set pagina = request.endpoint %}
+  {% set opciones = [
+    ("registrar", "Registrar", url_for('produccion.registrar'), ('produccion.registrar', 'produccion.guardar')),
+    ("historial", "Historial", url_for('produccion.historial'), ('produccion.historial', 'produccion.corregir', 'produccion.confirmar_borrado')),
+    ("papelera", "Papelera", url_for('produccion.papelera'), ('produccion.papelera',)),
+    ("listas", "Listas", url_for('produccion.listas'), ('produccion.listas', 'produccion.agregar_a_lista', 'produccion.corregir_nombre')),
+    ("respaldo", "Respaldo", url_for('produccion.pagina_respaldo'), ('produccion.pagina_respaldo', 'produccion.exportar_respaldo')),
+  ] %}
+
+  <div class="marco">
+    <aside class="lateral">
+      <div class="lateral-cabeza">
+        <a href="{{ url_for('produccion.registrar') }}" class="marca">
+          {% if hay_logo %}
+            <img src="{{ url_for('produccion.logo') }}" alt="Adipolyu" class="logo">
+          {% else %}
+            ADIPOLYU
+          {% endif %}
+        </a>
+        {# Solo en el celular: menu.js abre y cierra el menú #}
+        <button type="button" class="boton-menu" aria-expanded="false" aria-controls="menu">Menú</button>
+      </div>
+      <p class="subtitulo">Producción del taller</p>
+      <nav id="menu" class="menu" aria-label="Menú">
+        {% for clave, nombre, direccion, paginas in opciones %}
+          <a href="{{ direccion }}" {% if pagina in paginas %}class="activo" aria-current="page"{% endif %}>
+            {{- icono(clave) -}}
+            <span>{{ nombre }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+    </aside>
+
+    <div class="principal">
+      {# Dentro de la columna del contenido, para no tapar el menú lateral #}
+      {% if modo_prueba %}
+        <div class="franja-prueba" role="note">
+          MODO PRUEBA · Datos de ejemplo. Nada de lo que hagas aquí cambia los registros reales del taller.
+        </div>
+      {% endif %}
+
+      {% if aviso_respaldo %}
+        <div class="franja-respaldo" role="note">
+          {{ aviso_respaldo }} Haz un respaldo al menos una vez por semana.
+          <a href="{{ url_for('produccion.pagina_respaldo') }}" class="boton-chico boton-chico-ambar">Hacer respaldo ahora</a>
+        </div>
+      {% endif %}
+
+      {% set mensajes = get_flashed_messages(with_categories=true) %}
+      <main class="contenido {% block ancho %}{% endblock %}">
+        {# Errores y advertencias se quedan en la página: piden atención #}
+        {% for categoria, mensaje in mensajes if categoria != "exito" %}
+          <p class="aviso aviso-{{ categoria }}" role="status">{{ mensaje }}</p>
+        {% endfor %}
+
+        {% block contenido %}{% endblock %}
+      </main>
     </div>
-  {% endif %}
+  </div>
 
-  <header class="encabezado">
-    <span class="marca">Adipolyu</span>
-    <span class="subtitulo">Producción del taller</span>
-    {# El enlace de la página abierta se resalta #}
-    {% set pagina = request.endpoint %}
-    <nav class="menu" aria-label="Menú">
-      <a href="{{ url_for('produccion.registrar') }}"
-         {% if pagina in ('produccion.registrar', 'produccion.guardar') %}class="activo" aria-current="page"{% endif %}>Registrar</a>
-      <a href="{{ url_for('produccion.historial') }}"
-         {% if pagina in ('produccion.historial', 'produccion.corregir', 'produccion.confirmar_borrado') %}class="activo" aria-current="page"{% endif %}>Historial</a>
-      <a href="{{ url_for('produccion.papelera') }}"
-         {% if pagina == 'produccion.papelera' %}class="activo" aria-current="page"{% endif %}>Papelera</a>
-      <a href="{{ url_for('produccion.listas') }}"
-         {% if pagina in ('produccion.listas', 'produccion.agregar_a_lista', 'produccion.corregir_nombre') %}class="activo" aria-current="page"{% endif %}>Listas</a>
-      <a href="{{ url_for('produccion.pagina_respaldo') }}"
-         {% if pagina in ('produccion.pagina_respaldo', 'produccion.exportar_respaldo') %}class="activo" aria-current="page"{% endif %}>Respaldo</a>
-    </nav>
-  </header>
+  {# Mensajes de éxito: notificación flotante arriba a la derecha.
+     notificaciones.js la cierra a los 10 segundos (no mientras el mouse esté encima) #}
+  <div class="notificaciones{% if modo_prueba %} bajo-franja{% endif %}" aria-live="polite">
+    {% for categoria, mensaje in mensajes if categoria == "exito" %}
+      <div class="notificacion" role="status">
+        <svg class="icono notificacion-icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/>
+        </svg>
+        <p class="notificacion-texto">{{ mensaje }}</p>
+        <button type="button" class="notificacion-cerrar" title="Cerrar" aria-label="Cerrar aviso">
+          <svg class="icono" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    {% endfor %}
+  </div>
 
-  {% if aviso_respaldo %}
-    <div class="franja-respaldo" role="note">
-      {{ aviso_respaldo }} Haz un respaldo al menos una vez por semana.
-      <a href="{{ url_for('produccion.pagina_respaldo') }}">Hacer respaldo ahora</a>
-    </div>
-  {% endif %}
-
-  <main class="contenido {% block ancho %}{% endblock %}">
-    {% with mensajes = get_flashed_messages(with_categories=true) %}
-      {% for categoria, mensaje in mensajes %}
-        <p class="aviso aviso-{{ categoria }}" role="status">{{ mensaje }}</p>
-      {% endfor %}
-    {% endwith %}
-
-    {% block contenido %}{% endblock %}
-  </main>
-
+  <script src="{{ url_for('static', filename='menu.js') }}"></script>
+  <script src="{{ url_for('static', filename='notificaciones.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

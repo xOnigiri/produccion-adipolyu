@@ -14,7 +14,8 @@
   <p class="vacio">La papelera está vacía.</p>
 {% else %}
   <div class="tabla-contenedor">
-    <table class="tabla">
+    {# En gris, para que no se confunda con el historial #}
+    <table class="tabla tabla-papelera">
       <thead>
         <tr>
           {# Igual que en el historial: la acción va primero y fija a la izquierda #}
@@ -22,7 +23,7 @@
           <th>Fecha</th>
           <th>Pieza</th>
           <th>Material</th>
-          <th class="numero">Dureza (Shore A)</th>
+          <th class="numero">Dureza</th>
           <th>Lona</th>
           <th class="numero">Cant.</th>
           <th class="numero calculado">Mat. usado</th>
@@ -35,14 +36,18 @@
           <tr>
             <td class="acciones">
               <form method="post" action="{{ url_for('produccion.restaurar', registro_id=registro.id) }}">
-                <button type="submit" class="boton boton-pequeno">Restaurar</button>
+                <button type="submit" class="boton boton-pequeno boton-verde">Restaurar</button>
               </form>
             </td>
             <td class="sin-salto">{{ registro.fecha|fecha }}</td>
-            <td>{{ registro.pieza }}</td>
-            <td>{{ registro.material }}</td>
-            <td class="numero{% if registro.dureza_shore_a is none %} vacio-celda{% endif %}">{{ registro.dureza_shore_a|dureza }}</td>
-            <td>{{ "Sí" if registro.lleva_lona else "No" }}</td>
+            <td>{{ registro.pieza|nombre }}</td>
+            <td>{{ registro.material|nombre }}</td>
+            {% if registro.dureza_shore_a is none %}
+              <td class="numero vacio-celda">—</td>
+            {% else %}
+              <td class="numero"><span class="pastilla pastilla-gris">{{ registro.dureza_shore_a }}</span></td>
+            {% endif %}
+            <td><span class="pastilla pastilla-gris">{{ "Con lona" if registro.lleva_lona else "Sin lona" }}</span></td>
             <td class="numero">{{ registro.cantidad }}</td>
             <td class="numero calculado">{{ registro|material_usado|kg }}</td>
             <td class="sin-salto">{{ registro.borrado_en|fecha_hora }}</td>

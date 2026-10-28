@@ -1,4 +1,4 @@
-"""Pruebas de la dureza (Shore A) de cada pedido: base, formulario, historial,
+"""Pruebas de la dureza de cada pedido: base, formulario, historial,
 PDF y MODO PRUEBA.
 
 Todo se hace en carpetas temporales. Nunca abre produccion.db.
@@ -175,7 +175,9 @@ class FormularioConDurezaTest(ConHistorial):
 
     def test_formulario_muestra_la_lista(self):
         html = self.html("/registrar")
-        self.assertIn("Dureza (Shore A)", html)
+        # En el taller se dice solo "Dureza": sin "Shore A" ni "(opcional)"
+        self.assertIn('<label for="dureza_shore_a">Dureza</label>', html)
+        self.assertNotIn("Shore", html)
         self.assertIn('<option value="">— sin dato —</option>', html)
         for dureza in crear_base.DUREZAS_SHORE_A:
             self.assertIn(f'<option value="{dureza}" >{dureza}</option>', html)
@@ -187,7 +189,7 @@ class FormularioConDurezaTest(ConHistorial):
         respuesta = self.cliente.post(
             "/registrar", data=self.formulario(dureza_shore_a="70"), follow_redirects=True
         )
-        self.assertIn("retén · nitrilo · 70 Shore A · con lona", respuesta.get_data(as_text=True))
+        self.assertIn("Retén · Nitrilo · Dureza 70 · con lona", respuesta.get_data(as_text=True))
         self.cliente.post("/registrar", data=self.formulario(dureza_shore_a=""))
         self.assertEqual(self.guardado(), [70, None])
 
@@ -224,8 +226,11 @@ class HistorialConDurezaTest(ConHistorial):
 
     def test_columna_con_dureza_o_guion(self):
         html = self.html("/historial")
-        self.assertIn("Dureza (Shore A)", html)
-        self.assertIn('<td class="numero">70</td>', html)
+        self.assertIn('<th class="numero">Dureza</th>', html)
+        self.assertNotIn("Shore", html)
+        # En la tabla la pastilla lleva solo el número (la columna ya dice Dureza);
+        # sin dato, un guion
+        self.assertIn('<span class="pastilla pastilla-gris">70</span></td>', html)
         self.assertIn('<td class="numero vacio-celda">—</td>', html)
 
     def test_filtrar_por_dureza(self):
@@ -233,7 +238,7 @@ class HistorialConDurezaTest(ConHistorial):
         self.assertIn("con-70", html)
         self.assertNotIn("con-80", html)
         self.assertNotIn("sin-dureza", html)
-        self.assertIn("· 70 Shore A", html)
+        self.assertIn("· Dureza 70", html)
         self.assertIn('<option value="70" selected>70</option>', html)
 
     def test_filtrar_sin_dato(self):
@@ -251,7 +256,8 @@ class HistorialConDurezaTest(ConHistorial):
         registro_id = self.insertar(HOY, dureza=95)
         self.cliente.post(f"/registro/{registro_id}/borrar")
         html = self.html("/papelera")
-        self.assertIn('<td class="numero">95</td>', html)
+        self.assertIn('<span class="pastilla pastilla-gris">95</span></td>', html)
+        self.assertNotIn("Shore", html)
 
 
 class PdfConDurezaTest(ConInforme):
@@ -268,9 +274,10 @@ class PdfConDurezaTest(ConInforme):
 
     def test_filtro_en_el_titulo_y_el_nombre(self):
         respuesta = self.pdf("/historial/pdf?dureza=70")
-        self.assertIn("_shore-a-70.pdf", respuesta.headers["Content-Disposition"])
+        self.assertIn("_dureza-70.pdf", respuesta.headers["Content-Disposition"])
         texto = texto_del_pdf(respuesta.data)
-        self.assertIn("Dureza: 70 Shore A", texto)
+        self.assertIn("Dureza: 70", texto)
+        self.assertNotIn("Shore", texto)
         self.assertIn("con-70", texto)
         self.assertNotIn("sin-dureza", texto)
 

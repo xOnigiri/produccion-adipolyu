@@ -273,11 +273,35 @@ class PaginaRespaldoTest(ConDriveFalso):
 
         hace = datetime.combine(date.today() - timedelta(days=8), datetime.min.time())
         self.estado.write_text(f"{hace.isoformat()}\ncarpeta\n", encoding="utf-8")
-        self.assertIn("Último respaldo: hace 8 días", self.html("/registrar"))
+        html = self.html("/registrar")
+        self.assertIn("Último respaldo: hace 8 días", html)
+        # El enlace de la franja se ve como botón pequeño, sin subrayado
+        self.assertIn('class="boton-chico boton-chico-ambar">Hacer respaldo ahora</a>', html)
 
         hace = datetime.combine(date.today() - timedelta(days=2), datetime.min.time())
         self.estado.write_text(f"{hace.isoformat()}\ncarpeta\n", encoding="utf-8")
         self.assertNotIn("franja-respaldo", self.html("/historial"))
+
+    def test_tarjeta_del_ultimo_respaldo(self):
+        html = self.html("/respaldo")
+        self.assertIn("Ninguno todavía", html)
+        self.assertIn("estado-respaldo-vencido", html)
+        self.assertIn("Toca hacer respaldo", html)
+
+        # (días atrás, texto grande, al día)
+        for dias, texto, al_dia in ((0, "Hoy", True), (1, "Ayer", True),
+                                    (6, "Hace 6 días", True), (7, "Hace 7 días", False)):
+            with self.subTest(dias=dias):
+                hace = datetime.combine(date.today() - timedelta(days=dias), datetime.min.time())
+                self.estado.write_text(f"{hace.isoformat()}\ncarpeta\n", encoding="utf-8")
+                html = self.html("/respaldo")
+                self.assertIn(f'<p class="cifra-valor">{texto}</p>', html)
+                if al_dia:
+                    self.assertIn("estado-respaldo-ok", html)
+                    self.assertIn('<span class="pastilla pastilla-verde">Al día</span>', html)
+                else:
+                    self.assertIn("estado-respaldo-vencido", html)
+                    self.assertIn("Toca hacer respaldo", html)
 
     def test_sin_aviso_en_la_propia_pagina_de_respaldo(self):
         self.assertNotIn("franja-respaldo", self.html("/respaldo"))

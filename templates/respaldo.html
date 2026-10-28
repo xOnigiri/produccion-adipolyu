@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block titulo %}Respaldo{% endblock %}
+{% block ancho %}contenido-angosto{% endblock %}
 
 {% block contenido %}
 <h1>Respaldo</h1>
@@ -11,6 +12,35 @@
     ({{ ruta_db }}). Solo la base real se respalda en Google Drive.
   </p>
 {% else %}
+  {# Verde si está al día; ámbar si pasaron 7 días o más, o si nunca hubo uno #}
+  {% set al_dia = dias is not none and dias < dias_aviso %}
+  <div class="estado-respaldo {{ 'estado-respaldo-ok' if al_dia else 'estado-respaldo-vencido' }}">
+    <div>
+      <p class="cifra-nombre">Último respaldo</p>
+      <p class="cifra-valor">
+        {%- if dias is none %}Ninguno todavía
+        {%- elif dias == 0 %}Hoy
+        {%- elif dias == 1 %}Ayer
+        {%- else %}Hace {{ dias }} días{% endif -%}
+      </p>
+      {% if al_dia %}
+        <span class="pastilla pastilla-verde">Al día</span>
+      {% else %}
+        <span class="pastilla pastilla-ambar">Toca hacer respaldo</span>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('produccion.exportar_respaldo') }}">
+      <button type="submit" class="boton">Exportar respaldo ahora</button>
+    </form>
+  </div>
+
+  {% if destino.en_drive and not disponible %}
+    <p class="aviso aviso-error" role="alert">
+      No se encuentra {{ destino.unidad }}. Abre Google Drive para escritorio
+      e inicia sesión antes de hacer el respaldo.
+    </p>
+  {% endif %}
+
   <dl class="datos-respaldo">
     <dt>Destino</dt>
     <dd>
@@ -42,17 +72,6 @@
       {% endif %}
     </dd>
   </dl>
-
-  {% if destino.en_drive and not disponible %}
-    <p class="aviso aviso-error" role="alert">
-      No se encuentra {{ destino.unidad }}. Abre Google Drive para escritorio
-      e inicia sesión antes de hacer el respaldo.
-    </p>
-  {% endif %}
-
-  <form method="post" action="{{ url_for('produccion.exportar_respaldo') }}">
-    <button type="submit" class="boton">Exportar respaldo ahora</button>
-  </form>
 
   <p class="nota-respaldo">
     Cada respaldo es una carpeta nueva con la fecha y la hora. Los anteriores

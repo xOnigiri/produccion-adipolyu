@@ -34,10 +34,13 @@ MARGEN = 1.5 * cm
 ANCHO_UTIL = HOJA[0] - 2 * MARGEN
 ANCHO_LOGO = 6 * cm
 
-# Los mismos colores de la app
-AZUL = colors.HexColor("#1d4e89")
-GRIS_TITULOS = colors.HexColor("#e9edf2")
-CELESTE_CALCULADO = colors.HexColor("#eef3fa")
+# Los mismos colores de la app (los del logo). Las tablas siguen en blanco y gris
+# claro para que se lean bien impresas en blanco y negro.
+NARANJA = colors.HexColor("#c2470f")  # el naranja del logo, un poco más oscuro
+NARANJA_LOGO = colors.HexColor("#dc5212")
+VERDE = colors.HexColor("#0b8b48")
+GRIS_TITULOS = colors.HexColor("#eef0f3")
+CREMA_CALCULADO = colors.HexColor("#fff6ef")
 GRIS_BORDE = colors.HexColor("#c4ccd6")
 GRIS_TEXTO = colors.HexColor("#616e7c")
 AMARILLO_PRUEBA = colors.HexColor("#fff3c4")
@@ -50,7 +53,7 @@ COLUMNAS = [
     ("Fecha", 2.0, False, False),
     ("Pieza", 2.6, False, False),
     ("Material", 3.4, False, False),
-    ("Dureza", 1.5, True, False),  # Shore A
+    ("Dureza", 1.5, True, False),
     ("Lona", 1.3, False, False),
     ("Cant.", 1.3, True, False),
     ("Mat. recibido (g)", 2.1, True, False),
@@ -68,15 +71,18 @@ def _estilo(nombre, **opciones):
 
 
 CELDA = _estilo("celda")
-CELDA_TITULO = _estilo("celda_titulo", fontName="Helvetica-Bold")
-CELDA_TITULO_NUMERO = _estilo("celda_titulo_numero", fontName="Helvetica-Bold", alignment=TA_RIGHT)
-TITULO = _estilo("titulo", fontName="Helvetica-Bold", fontSize=20, leading=24, alignment=TA_RIGHT)
+# Títulos de la tabla en blanco sobre naranja
+CELDA_TITULO = _estilo("celda_titulo", fontName="Helvetica-Bold", textColor=colors.white)
+CELDA_TITULO_NUMERO = _estilo("celda_titulo_numero", fontName="Helvetica-Bold",
+                              textColor=colors.white, alignment=TA_RIGHT)
+TITULO = _estilo("titulo", fontName="Helvetica-Bold", fontSize=20, leading=24,
+                 textColor=NARANJA, alignment=TA_RIGHT)
 SUBTITULO = _estilo("subtitulo", fontSize=11, leading=14, alignment=TA_RIGHT)
 DETALLE = _estilo("detalle", textColor=GRIS_TEXTO, alignment=TA_RIGHT)
 MARCA_SIN_LOGO = _estilo("marca", fontName="Helvetica-Bold", fontSize=24, leading=28,
-                         textColor=AZUL)
+                         textColor=NARANJA_LOGO)
 CIFRA = _estilo("cifra", fontName="Helvetica-Bold", fontSize=22, leading=26,
-                textColor=AZUL, alignment=TA_CENTER)
+                textColor=NARANJA, alignment=TA_CENTER)
 CIFRA_NOMBRE = _estilo("cifra_nombre", fontSize=10, textColor=GRIS_TEXTO, alignment=TA_CENTER)
 SECCION = _estilo("seccion", fontName="Helvetica-Bold", fontSize=11, leading=14,
                   spaceAfter=4)
@@ -108,7 +114,7 @@ def generar_informe(registros, totales, textos, modo_prueba=False, ruta_logo=Non
     contenido = [
         _encabezado(textos, ruta_logo),
         Spacer(1, 0.25 * cm),
-        HRFlowable(width="100%", thickness=1.2, color=AZUL),
+        HRFlowable(width="100%", thickness=1.2, color=VERDE),
         Spacer(1, 0.35 * cm),
         _recuadro_resumen(totales),
         Spacer(1, 0.45 * cm),
@@ -162,9 +168,9 @@ def _recuadro_resumen(totales):
     fila = [[Paragraph(cifra, CIFRA), Paragraph(nombre, CIFRA_NOMBRE)] for cifra, nombre in cifras]
     tabla = Table([fila], colWidths=[ANCHO_UTIL / 3] * 3)
     tabla.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 1, AZUL),
+        ("BOX", (0, 0), (-1, -1), 1, NARANJA),
         ("LINEBEFORE", (1, 0), (-1, -1), 0.5, GRIS_BORDE),
-        ("BACKGROUND", (0, 0), (-1, -1), CELESTE_CALCULADO),
+        ("BACKGROUND", (0, 0), (-1, -1), CREMA_CALCULADO),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
@@ -178,8 +184,8 @@ def filas_de_pedidos(registros, totales):
         lona = calculos.lona_usada_g(registro)
         filas.append([
             formato.texto_fecha(registro["fecha"]),
-            registro["pieza"],
-            registro["material"],
+            formato.nombre_visible(registro["pieza"]),
+            formato.nombre_visible(registro["material"]),
             formato.texto_dureza(registro["dureza_shore_a"]),
             "Sí" if registro["lleva_lona"] else "No",
             str(registro["cantidad"]),
@@ -222,18 +228,17 @@ def _tabla_pedidos(registros, totales):
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.4, GRIS_BORDE),
-        ("BACKGROUND", (0, 0), (-1, 0), GRIS_TITULOS),
-        ("LINEBELOW", (0, 0), (-1, 0), 1, AZUL),
+        ("BACKGROUND", (0, 0), (-1, 0), NARANJA),
         ("ROWBACKGROUNDS", (0, 1), (-1, ultima - 1), [colors.white, colors.HexColor("#f8f9fb")]),
         ("BACKGROUND", (0, ultima), (-1, ultima), GRIS_TITULOS),
         ("FONTNAME", (0, ultima), (-1, ultima), "Helvetica-Bold"),
-        ("LINEABOVE", (0, ultima), (-1, ultima), 1, AZUL),
+        ("LINEABOVE", (0, ultima), (-1, ultima), 1, NARANJA),
     ]
     for columna, (_, _, es_numero, es_calculada) in enumerate(COLUMNAS):
         if es_numero:
             estilo.append(("ALIGN", (columna, 1), (columna, -1), "RIGHT"))
         if es_calculada:
-            estilo.append(("BACKGROUND", (columna, 1), (columna, ultima - 1), CELESTE_CALCULADO))
+            estilo.append(("BACKGROUND", (columna, 1), (columna, ultima - 1), CREMA_CALCULADO))
 
     # repeatRows=1: si la tabla pasa a otra hoja, los títulos se repiten
     tabla = Table([titulos, *filas], colWidths=anchos, repeatRows=1)
@@ -246,7 +251,7 @@ def _resumenes(totales):
     por_material = [["Material", "Usado (kg)", "Sobrante (kg)"]]
     for fila in totales["por_material"]:
         por_material.append([
-            fila["material"], formato.numero_kg(fila["usado_g"]),
+            formato.nombre_visible(fila["material"]), formato.numero_kg(fila["usado_g"]),
             formato.numero_kg(fila["sobrante_g"]),
         ])
     if totales["con_lona"]:
@@ -256,7 +261,10 @@ def _resumenes(totales):
         ])
 
     por_pieza = [["Pieza", "Unidades"]]
-    por_pieza += [[fila["pieza"], str(fila["cantidad"])] for fila in totales["por_pieza"]]
+    por_pieza += [
+        [formato.nombre_visible(fila["pieza"]), str(fila["cantidad"])]
+        for fila in totales["por_pieza"]
+    ]
     por_pieza.append(["Total", str(totales["piezas"])])
 
     ancho = ANCHO_UTIL / 2 - 0.5 * cm
@@ -284,15 +292,16 @@ def _tabla_resumen(filas, anchos, lona_al_final=False, total_al_final=False):
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 9),
         ("GRID", (0, 0), (-1, -1), 0.4, GRIS_BORDE),
-        ("BACKGROUND", (0, 0), (-1, 0), GRIS_TITULOS),
+        ("BACKGROUND", (0, 0), (-1, 0), NARANJA),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
     ]
     if lona_al_final:
         # La lona no es un material del pedido: se separa con una línea
-        estilo += [("LINEABOVE", (0, -1), (-1, -1), 1, AZUL),
+        estilo += [("LINEABOVE", (0, -1), (-1, -1), 1, NARANJA),
                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Oblique")]
     if total_al_final:
-        estilo += [("LINEABOVE", (0, -1), (-1, -1), 1, AZUL),
+        estilo += [("LINEABOVE", (0, -1), (-1, -1), 1, NARANJA),
                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
                    ("BACKGROUND", (0, -1), (-1, -1), GRIS_TITULOS)]
     tabla.setStyle(TableStyle(estilo))

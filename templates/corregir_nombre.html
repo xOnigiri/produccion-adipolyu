@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block titulo %}Corregir nombre{% endblock %}
+{% block ancho %}contenido-angosto{% endblock %}
 
 {% block contenido %}
 <h1>Corregir el nombre de {{ lista.la }} {{ lista.singular }}</h1>
@@ -8,7 +9,7 @@
 <div class="tarjeta">
   {% if nuevo %}
     {# Paso 2: confirmar viendo a cuántos registros afecta #}
-    <p class="cambio-nombre">«{{ actual.nombre }}» → «{{ nuevo }}»</p>
+    <p class="cambio-nombre"><strong>{{ actual.nombre|nombre }}</strong> → <strong>{{ nuevo|nombre }}</strong></p>
     {% if actual.registros or actual.en_papelera %}
       <p>
         Afecta a <strong>{{ actual|uso }}</strong>: todos mostrarán el nombre nuevo, igual que
@@ -28,7 +29,7 @@
   {% else %}
     {# Paso 1: escribir el nombre corregido #}
     <p class="nota">
-      Nombre actual: <strong>«{{ actual.nombre }}»</strong> · usado en {{ actual|uso }}.
+      Nombre actual: <strong>{{ actual.nombre|nombre }}</strong> · usado en {{ actual|uso }}.
     </p>
     <form method="post">
       <input type="hidden" name="paso" value="revisar">

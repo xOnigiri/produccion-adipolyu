@@ -95,13 +95,13 @@ class VerHistorialTest(ConHistorial):
     def test_historial_vacio(self):
         html = self.html("/historial")
         self.assertIn("No hay registros en este periodo", html)
-        self.assertIn('class="activo" aria-current="page">Historial', html)
+        self.assertEqual(self.opcion_resaltada(html), ["Historial"])
 
     def test_muestra_columnas_en_gramos_y_kg(self):
         self.insertar(HOY, observaciones="2 piezas con burbuja")
         html = self.html("/historial")
-        for texto in ("3600.5 g", "400 g", "3.20 kg", "64 g", "250 g", "30 g", "0.22 kg",
-                      "2 piezas con burbuja", "retén", "nitrilo"):
+        for texto in ("3600,5 g", "400 g", "3,20 kg", "64 g", "250 g", "30 g", "0,22 kg",
+                      "2 piezas con burbuja", "<td>Retén</td>", "<td>Nitrilo</td>"):
             self.assertIn(texto, html)
 
     def test_acciones_van_al_inicio_de_cada_fila(self):
@@ -109,8 +109,21 @@ class VerHistorialTest(ConHistorial):
         self.insertar(HOY - timedelta(days=1))
         html = self.html("/historial?periodo=todo")
         # Las 2 filas de pedidos empiezan con la celda de acciones (con Corregir y Borrar)
-        filas = re.findall(r'<tr>\s*<td class="acciones">\s*<a [^>]*>Corregir</a>\s*<a ', html)
+        filas = re.findall(
+            r'<tr>\s*<td class="acciones">\s*<a [^>]*title="Corregir">'
+            r'.*?<a [^>]*title="Borrar">', html, re.S)
         self.assertEqual(len(filas), 2)
+
+    def test_corregir_y_borrar_son_botones_de_icono(self):
+        self.insertar(date(2026, 10, 22))
+        html = self.html("/historial?periodo=todo")
+        # Sin texto visible: el icono, el nombre al pasar el mouse y el texto para lectores
+        self.assertIn('class="boton-icono" title="Corregir">', html)
+        self.assertIn('class="boton-icono boton-icono-borrar" title="Borrar">', html)
+        self.assertIn('<span class="solo-lector">Corregir el pedido del 22/10/2026</span>', html)
+        self.assertIn('<span class="solo-lector">Borrar el pedido del 22/10/2026</span>', html)
+        self.assertNotIn(">Corregir</a>", html)
+        self.assertNotIn(">Borrar</a>", html)
 
     def test_sin_lona_muestra_guion(self):
         self.insertar(HOY, lona=None, dureza=70)
@@ -132,27 +145,33 @@ class VerHistorialTest(ConHistorial):
                       recibido=2000, sobrante=150, lona=None)
         html = self.html("/historial")
         self.assertIn("170", html)  # 50 + 120 piezas
-        self.assertIn("5.05 kg", html)  # 3200.5 + 1850 g
-        self.assertIn("0.22 kg", html)
-        self.assertIn("1.85 kg", html)  # silicona naranja usada
-        self.assertIn("0.15 kg", html)  # silicona naranja sobrante
+        self.assertIn("5,05 kg", html)  # 3200.5 + 1850 g
+        self.assertIn("0,22 kg", html)
+        self.assertIn("1,85 kg", html)  # silicona naranja usada
+        self.assertIn("0,15 kg", html)  # silicona naranja sobrante
 
     def test_total_redondea_igual_que_las_filas(self):
-        # Filas: 525 g -> 0.53 kg y 220 g -> 0.22 kg. Total: 745 g -> 0.75 kg (no 0.74)
+        # Filas: 525 g -> 0,53 kg y 220 g -> 0,22 kg. Total: 745 g -> 0,75 kg (no 0,74)
         self.insertar(HOY, material="jebe azul", lona=(600, 75))
         self.insertar(HOY)
         html = self.html("/historial")
-        self.assertIn("0.53 kg", html)
-        self.assertIn("0.22 kg", html)
-        self.assertIn("0.75 kg", html)
-        self.assertNotIn("0.74 kg", html)
+        self.assertIn("0,53 kg", html)
+        self.assertIn("0,22 kg", html)
+        self.assertIn("0,75 kg", html)
+        self.assertNotIn("0,74", html)
 
     def test_menu_en_todas_las_paginas(self):
-        for direccion in ("/registrar", "/historial", "/papelera"):
-            html = self.html(direccion)
-            for enlace in ("Registrar", "Historial", "Papelera"):
-                self.assertIn(f">{enlace}</a>", html)
-            self.assertNotIn("MODO PRUEBA", html)
+        paginas = {"/registrar": "Registrar", "/historial": "Historial", "/papelera": "Papelera",
+                   "/listas": "Listas", "/respaldo": "Respaldo"}
+        for direccion, nombre in paginas.items():
+            with self.subTest(direccion=direccion):
+                html = self.html(direccion)
+                for enlace in paginas.values():
+                    self.assertIn(f"<span>{enlace}</span>", html)
+                self.assertEqual(self.opcion_resaltada(html), [nombre])
+                self.assertIn('<img src="/logo.png" alt="Adipolyu"', html)
+                self.assertIn('rel="icon" type="image/png" href="/static/icono.png"', html)
+                self.assertNotIn("MODO PRUEBA", html)
 
 
 class FiltrosTest(ConHistorial):
@@ -183,7 +202,7 @@ class FiltrosTest(ConHistorial):
         for fuera in ("anillo nitrilo", "retén azul", "retén septiembre"):
             self.assertNotIn(fuera, html)
         self.assertIn(
-            "Del 01/10/2026 al 31/10/2026</strong> · retén · nitrilo · 1 pedido",
+            "Del 01/10/2026 al 31/10/2026</strong> · Retén · Nitrilo · 1 pedido",
             " ".join(html.split()),
         )
 
@@ -191,7 +210,7 @@ class FiltrosTest(ConHistorial):
         self.insertar(date(2026, 10, 5))
         html = self.html("/historial?periodo=rango&desde=2026-10-31&hasta=2026-10-01")
         self.assertIn("es posterior a", html)
-        self.assertNotIn("3600.5 g", html)
+        self.assertNotIn("3600,5 g", html)
 
     def test_filtros_raros_no_rompen_la_pagina(self):
         self.html("/historial?periodo=xyz&pieza_id=abc&desde=no-es-fecha")
@@ -206,9 +225,9 @@ class CorregirTest(ConHistorial):
         registro_id = self.insertar(date(2026, 10, 22), observaciones="2 piezas con burbuja")
         html = self.html(f"/registro/{registro_id}/corregir")
         self.assertIn("Corregir registro", html)
-        self.assertIn("Estás corrigiendo el pedido del 22/10/2026 · retén · nitrilo", html)
+        self.assertIn("Estás corrigiendo el pedido del 22/10/2026 · Retén · Nitrilo", html)
         self.assertIn('value="2026-10-22"', html)
-        self.assertIn('value="3600.5"', html)
+        self.assertIn('value="3600,5"', html)
         self.assertIn('value="400"', html)
         self.assertIn("checked", html)
         self.assertIn("2 piezas con burbuja", html)
@@ -216,7 +235,7 @@ class CorregirTest(ConHistorial):
 
     def test_corregir_muestra_los_gramos_sin_redondear(self):
         registro_id = self.insertar(HOY, recibido=3600.125)
-        self.assertIn('value="3600.125"', self.html(f"/registro/{registro_id}/corregir"))
+        self.assertIn('value="3600,125"', self.html(f"/registro/{registro_id}/corregir"))
 
     def test_corregir_guarda_y_vuelve_al_historial_con_filtros(self):
         registro_id = self.insertar(HOY)
@@ -261,7 +280,7 @@ class CorregirTest(ConHistorial):
     def test_corregir_registro_con_pieza_desactivada(self):
         registro_id = self.insertar(HOY, pieza="pieza retirada")
         html = self.html(f"/registro/{registro_id}/corregir")
-        self.assertIn("pieza retirada", html)
+        self.assertIn(">Pieza retirada</option>", html)
 
         respuesta = self.cliente.post(
             f"/registro/{registro_id}/corregir",
@@ -271,7 +290,7 @@ class CorregirTest(ConHistorial):
         self.assertEqual(self.fila(registro_id)["cantidad"], 7)
 
         # Pero en un registro nuevo no aparece
-        self.assertNotIn(">pieza retirada</option>", self.html("/registrar"))
+        self.assertNotIn(">Pieza retirada</option>", self.html("/registrar"))
 
     def test_corregir_registro_inexistente(self):
         respuesta = self.cliente.get("/registro/999/corregir", follow_redirects=True)
@@ -292,7 +311,7 @@ class BorrarTest(ConHistorial):
         html = self.html(f"/registro/{registro_id}/borrar")
         self.assertIn("¿Borrar este registro?", html)
         self.assertIn(
-            "22/10/2026 · retén · nitrilo · con lona · 50 unidades · material usado 3.20 kg", html
+            "22/10/2026 · Retén · Nitrilo · con lona · 50 unidades · material usado 3,20 kg", html
         )
         self.assertIn("Sí, borrar", html)
         self.assertIn("No, volver", html)

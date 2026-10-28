@@ -1,11 +1,13 @@
-"""Cómo se muestran fechas y pesos en pantalla.
+"""Cómo se muestran fechas, pesos y nombres en pantalla.
 
-Se usa en el formulario y el historial, y se reutilizará en el informe PDF,
-para que todo muestre los números de la misma forma.
+Se usa en el formulario, el historial y el informe PDF, para que todo muestre
+los números de la misma forma: con coma decimal (3600,5 g · 3,20 kg).
 """
 
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+
+from markupsafe import Markup
 
 from calculos import lona_usada_g, material_usado_g
 
@@ -27,6 +29,26 @@ def _sin_ceros_sobrantes(numero):
     return texto.rstrip("0").rstrip(".") if "." in texto else texto
 
 
+def _con_coma(texto):
+    """'3600.5' -> '3600,5'. Sin separador de miles, así el punto solo puede ser el decimal."""
+    return texto.replace(".", ",")
+
+
+def nombre_visible(nombre):
+    """'jebe natural' -> 'Jebe natural'. Solo para mostrar: en la base sigue en minúsculas."""
+    return nombre[:1].upper() + nombre[1:]
+
+
+def nombre_en_negrita(nombre):
+    """'soporte' -> '<strong>Soporte</strong>', para los mensajes en pantalla.
+
+    Markup escapa el nombre: si alguien escribiera '<b>x</b>' como nombre, se ve
+    tal cual, como texto, y no se interpreta como HTML. Para unir el resultado con
+    otro texto se usa Markup(...).format(...), que también escapa lo que recibe.
+    """
+    return Markup("<strong>{}</strong>").format(nombre_visible(nombre))
+
+
 def texto_fecha(fecha_iso):
     """'2026-10-22' -> '22/10/2026'."""
     return date.fromisoformat(fecha_iso).strftime("%d/%m/%Y")
@@ -39,28 +61,28 @@ def texto_fecha_hora(texto):
 
 
 def texto_gramos(gramos):
-    """3600.5 -> '3600.5' y 400.0 -> '400' (sin ceros sobrantes, hasta 2 decimales)."""
-    return _sin_ceros_sobrantes(redondear(gramos, 2))
+    """3600.5 -> '3600,5' y 400.0 -> '400' (sin ceros sobrantes, hasta 2 decimales)."""
+    return _con_coma(_sin_ceros_sobrantes(redondear(gramos, 2)))
 
 
 def numero_kg(gramos):
-    """3200.5 g -> '3.20' y 745 g -> '0.75' (sin la unidad, para tablas con '(kg)' arriba)."""
+    """3200.5 g -> '3,20' y 745 g -> '0,75' (sin la unidad, para tablas con '(kg)' arriba)."""
     kilos = Decimal(str(gramos)) / 1000  # división exacta, sin ruido
-    return format(redondear(kilos, 2), "f")
+    return _con_coma(format(redondear(kilos, 2), "f"))
 
 
 def texto_kg(gramos):
-    """3200.5 g -> '3.20 kg' y 745 g -> '0.75 kg'."""
+    """3200.5 g -> '3,20 kg' y 745 g -> '0,75 kg'."""
     return f"{numero_kg(gramos)} kg"
 
 
 def numero_g_por_pieza(gramos):
-    """64.01 -> '64' y 15.45 -> '15.5' (un decimal basta para el promedio)."""
-    return _sin_ceros_sobrantes(redondear(gramos, 1))
+    """64.01 -> '64' y 15.45 -> '15,5' (un decimal basta para el promedio)."""
+    return _con_coma(_sin_ceros_sobrantes(redondear(gramos, 1)))
 
 
 def texto_g_por_pieza(gramos):
-    """64.01 -> '64 g' y 15.45 -> '15.5 g'."""
+    """64.01 -> '64 g' y 15.45 -> '15,5 g'."""
     return numero_g_por_pieza(gramos) + " g"
 
 
@@ -70,12 +92,16 @@ def texto_dureza(dureza):
 
 
 def describir_registro(registro):
-    """'22/10/2026 · retén · nitrilo · 70 Shore A · con lona · 50 unidades · material usado ...'.
+    """'22/10/2026 · Retén · Nitrilo · Dureza 70 · con lona · 50 unidades · material usado ...'.
     Recibe una fila de produccion con los nombres de pieza y material ya unidos
     (ver base_datos.obtener_registro). Sin dureza, esa parte no aparece."""
-    partes = [texto_fecha(registro["fecha"]), registro["pieza"], registro["material"]]
+    partes = [
+        texto_fecha(registro["fecha"]),
+        nombre_visible(registro["pieza"]),
+        nombre_visible(registro["material"]),
+    ]
     if registro["dureza_shore_a"] is not None:
-        partes.append(f"{registro['dureza_shore_a']} Shore A")
+        partes.append(f"Dureza {registro['dureza_shore_a']}")
     partes += [
         "con lona" if registro["lleva_lona"] else "sin lona",
         f"{registro['cantidad']} {'unidad' if registro['cantidad'] == 1 else 'unidades'}",

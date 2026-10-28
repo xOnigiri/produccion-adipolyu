@@ -98,7 +98,7 @@ class RegistroConErroresTest(unittest.TestCase):
         self.assertError(
             formulario(material_sobrante_g="4000"),
             "material_sobrante_g",
-            "El material sobrante (4000 g) no puede ser mayor que el recibido (3600.5 g).",
+            "El material sobrante (4000 g) no puede ser mayor que el recibido (3600,5 g).",
         )
 
     def test_lona_sobrante_mayor_que_recibida(self):

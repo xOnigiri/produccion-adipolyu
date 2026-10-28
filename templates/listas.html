@@ -2,6 +2,7 @@
 
 {% block titulo %}Listas{% endblock %}
 {% block ancho %}contenido-medio{% endblock %}
+{% from "_iconos.html" import icono %}
 
 {% block contenido %}
 <h1>Piezas y materiales</h1>
@@ -33,7 +34,7 @@
       {% if error and error.repetido and not error.repetido.activo %}
         <form method="post" action="{{ url_for('produccion.reactivar', tipo=tipo, elemento_id=error.repetido.id) }}" class="reactivar-repetido">
           <span>Está {{ lista.genero("inactiv") }}.</span>
-          <button type="submit" class="boton boton-pequeno">Reactivar «{{ error.repetido.nombre }}»</button>
+          <button type="submit" class="boton boton-pequeno">Reactivar <strong>{{ error.repetido.nombre|nombre }}</strong></button>
         </form>
       {% endif %}
 
@@ -49,21 +50,29 @@
         <tbody>
           {% for fila in filas %}
             <tr {% if not fila.activo %}class="fila-inactiva"{% endif %}>
-              <td>{{ fila.nombre }}</td>
-              <td>{{ lista.genero("Activ") if fila.activo else lista.genero("Inactiv") }}</td>
+              <td>{{ fila.nombre|nombre }}</td>
+              <td>
+                {% if fila.activo %}<span class="pastilla pastilla-verde">{{ lista.genero("Activ") }}</span>
+                {% else %}<span class="pastilla pastilla-apagada">{{ lista.genero("Inactiv") }}</span>{% endif %}
+              </td>
               <td class="numero">
                 {{ fila.registros }}
                 {% if fila.en_papelera %}<span class="papelera-conteo">+{{ fila.en_papelera }} en papelera</span>{% endif %}
               </td>
+              {# Botones pequeños; el nombre va aparte para los lectores de pantalla #}
+              {% set para_lector = " " ~ lista.la ~ " " ~ lista.singular ~ " " ~ fila.nombre|nombre %}
               <td class="acciones-lista">
-                <a href="{{ url_for('produccion.corregir_nombre', tipo=tipo, elemento_id=fila.id) }}">Corregir nombre</a>
+                <a href="{{ url_for('produccion.corregir_nombre', tipo=tipo, elemento_id=fila.id) }}"
+                   class="boton-chico boton-chico-gris">
+                  {{- icono("corregir") -}}
+                  Corregir nombre<span class="solo-lector"> de{{ para_lector }}</span></a>
                 {% if not fila.activo %}
                   <form method="post" action="{{ url_for('produccion.reactivar', tipo=tipo, elemento_id=fila.id) }}">
-                    <button type="submit" class="enlace">Reactivar</button>
+                    <button type="submit" class="boton-chico boton-chico-verde">Reactivar<span class="solo-lector">{{ para_lector }}</span></button>
                   </form>
                 {% elif activos > 1 %}
                   <form method="post" action="{{ url_for('produccion.desactivar', tipo=tipo, elemento_id=fila.id) }}">
-                    <button type="submit" class="enlace enlace-borrar">Desactivar</button>
+                    <button type="submit" class="boton-chico boton-chico-rojo">Desactivar<span class="solo-lector">{{ para_lector }}</span></button>
                   </form>
                 {% else %}
                   <span class="nota-ultimo">{{ lista.aviso_ultimo }}</span>

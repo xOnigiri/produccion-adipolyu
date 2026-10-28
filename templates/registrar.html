@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_cifras.html" import tarjetas %}
 
 {# La misma página sirve para registrar un pedido nuevo y para corregir uno guardado #}
 {% block titulo %}{% if corrigiendo %}Corregir registro{% else %}Registrar producción{% endif %}{% endblock %}
@@ -12,7 +13,7 @@
 {% endmacro %}
 
 {# Campo de peso en gramos: texto que acepta coma o punto decimal #}
-{% macro campo_gramos(campo, etiqueta, obligatorio=true) %}
+{% macro campo_gramos(campo, etiqueta, obligatorio=true, con_valor=true) %}
   <div class="campo">
     <label for="{{ campo }}">{{ etiqueta }}</label>
     <div class="con-unidad">
@@ -21,7 +22,7 @@
              pattern="\d+([.,]\d+)?"
              title="Solo números, con coma o punto decimal. Ejemplo: 3600,5"
              placeholder="Ej.: 3600,5"
-             value="{{ valores[campo] or '' }}"
+             value="{{ (valores[campo] or '') if con_valor else '' }}"
              {% if obligatorio %}required{% endif %}
              {% if errores[campo] %}class="con-error" aria-invalid="true" aria-describedby="error-{{ campo }}"{% endif %}>
       <span class="unidad">g</span>
@@ -33,11 +34,13 @@
 {% if corrigiendo %}
   <h1>Corregir registro</h1>
   <p class="corrigiendo">
-    Estás corrigiendo el pedido del {{ corrigiendo.fecha|fecha }} · {{ corrigiendo.pieza }} · {{ corrigiendo.material }}.
+    Estás corrigiendo el pedido del {{ corrigiendo.fecha|fecha }} · {{ corrigiendo.pieza|nombre }} · {{ corrigiendo.material|nombre }}.
     Se aplican las mismas reglas que al registrar.
   </p>
 {% else %}
   <h1>Registrar producción</h1>
+  <h2 class="seccion-titulo">Esta semana</h2>
+  {{ tarjetas(semana, comparacion, con_lona=false) }}
 {% endif %}
 
 {% if errores %}
@@ -53,96 +56,108 @@
   {% if corrigiendo %}
     <input type="hidden" name="volver" value="{{ volver }}">
   {% endif %}
-  <div class="campo">
-    <label for="fecha">Fecha</label>
-    <input type="date" id="fecha" name="fecha" required max="{{ hoy }}"
-           value="{{ valores.fecha or '' }}"
-           {% if errores.fecha %}class="con-error" aria-invalid="true" aria-describedby="error-fecha"{% endif %}>
-    {{ error("fecha") }}
-  </div>
+  <div class="columnas-formulario">
+    {# Izquierda: qué se hizo #}
+    <div>
+      <div class="campo">
+        <label for="fecha">Fecha</label>
+        <input type="date" id="fecha" name="fecha" required max="{{ hoy }}"
+               value="{{ valores.fecha or '' }}"
+               {% if errores.fecha %}class="con-error" aria-invalid="true" aria-describedby="error-fecha"{% endif %}>
+        {{ error("fecha") }}
+      </div>
 
-  <div class="fila">
-    <div class="campo">
-      <label for="pieza_id">Pieza</label>
-      <select id="pieza_id" name="pieza_id" required
-              {% if errores.pieza_id %}class="con-error" aria-invalid="true" aria-describedby="error-pieza_id"{% endif %}>
-        <option value="">Elige una pieza</option>
-        {% for pieza in piezas %}
-          <option value="{{ pieza.id }}" {% if valores.pieza_id == pieza.id|string %}selected{% endif %}>{{ pieza.nombre }}</option>
-        {% endfor %}
-      </select>
-      {{ error("pieza_id") }}
+      <div class="campo">
+        <label for="pieza_id">Pieza</label>
+        <select id="pieza_id" name="pieza_id" required
+                {% if errores.pieza_id %}class="con-error" aria-invalid="true" aria-describedby="error-pieza_id"{% endif %}>
+          <option value="">Elige una pieza</option>
+          {% for pieza in piezas %}
+            <option value="{{ pieza.id }}" {% if valores.pieza_id == pieza.id|string %}selected{% endif %}>{{ pieza.nombre|nombre }}</option>
+          {% endfor %}
+        </select>
+        {{ error("pieza_id") }}
+      </div>
+
+      <div class="campo">
+        <label for="material_id">Material</label>
+        <select id="material_id" name="material_id" required
+                {% if errores.material_id %}class="con-error" aria-invalid="true" aria-describedby="error-material_id"{% endif %}>
+          <option value="">Elige un material</option>
+          {% for material in materiales %}
+            <option value="{{ material.id }}" {% if valores.material_id == material.id|string %}selected{% endif %}>{{ material.nombre|nombre }}</option>
+          {% endfor %}
+        </select>
+        {{ error("material_id") }}
+      </div>
+
+      <div class="fila">
+        <div class="campo">
+          <label for="dureza_shore_a">Dureza</label>
+          <select id="dureza_shore_a" name="dureza_shore_a"
+                  {% if errores.dureza_shore_a %}class="con-error" aria-invalid="true" aria-describedby="error-dureza_shore_a"{% endif %}>
+            <option value="">— sin dato —</option>
+            {% for dureza in durezas %}
+              <option value="{{ dureza }}" {% if valores.dureza_shore_a == dureza|string %}selected{% endif %}>{{ dureza }}</option>
+            {% endfor %}
+          </select>
+          {{ error("dureza_shore_a") }}
+        </div>
+
+        <div class="campo">
+          <label for="cantidad">Cantidad (unidades)</label>
+          <input type="number" id="cantidad" name="cantidad" required min="1" step="1"
+                 inputmode="numeric" placeholder="Ej.: 50"
+                 value="{{ valores.cantidad or '' }}"
+                 {% if errores.cantidad %}class="con-error" aria-invalid="true" aria-describedby="error-cantidad"{% endif %}>
+          {{ error("cantidad") }}
+        </div>
+      </div>
     </div>
 
-    <div class="campo">
-      <label for="material_id">Material</label>
-      <select id="material_id" name="material_id" required
-              {% if errores.material_id %}class="con-error" aria-invalid="true" aria-describedby="error-material_id"{% endif %}>
-        <option value="">Elige un material</option>
-        {% for material in materiales %}
-          <option value="{{ material.id }}" {% if valores.material_id == material.id|string %}selected{% endif %}>{{ material.nombre }}</option>
-        {% endfor %}
-      </select>
-      {{ error("material_id") }}
+    {# Derecha: cuánto material, lona y notas #}
+    <div>
+      <div class="fila">
+        {{ campo_gramos("material_recibido_g", "Material recibido") }}
+        {{ campo_gramos("material_sobrante_g", "Material sobrante") }}
+      </div>
+
+      <div class="campo campo-casilla">
+        <input type="checkbox" id="lleva_lona" name="lleva_lona" value="si"
+               {% if valores.lleva_lona == "si" %}checked{% endif %}>
+        <label for="lleva_lona">¿Lleva lona?</label>
+      </div>
+
+      {# Llega ya oculta si el pedido no lleva lona (así no parpadea al abrir la página),
+         y con sus campos obligatorios si lleva. formulario.js la muestra u oculta al
+         marcar o desmarcar la casilla. #}
+      {% set lleva_lona = valores.lleva_lona == "si" %}
+      <fieldset id="seccion-lona" class="seccion-lona" {% if not lleva_lona %}hidden{% endif %}>
+        <legend>Lona</legend>
+        <div class="fila">
+          {{ campo_gramos("lona_recibida_g", "Lona recibida", obligatorio=lleva_lona, con_valor=lleva_lona) }}
+          {{ campo_gramos("lona_sobrante_g", "Lona sobrante", obligatorio=lleva_lona, con_valor=lleva_lona) }}
+        </div>
+      </fieldset>
+
+      <div class="campo">
+        <label for="observaciones">Observaciones <span class="opcional">(opcional)</span></label>
+        <textarea id="observaciones" name="observaciones" rows="3" maxlength="500"
+                  placeholder="Ej.: 2 piezas con burbuja"
+                  {% if errores.observaciones %}class="con-error" aria-invalid="true" aria-describedby="error-observaciones"{% endif %}>{{ valores.observaciones or '' }}</textarea>
+        {{ error("observaciones") }}
+      </div>
     </div>
-  </div>
-
-  <div class="campo">
-    <label for="dureza_shore_a">Dureza (Shore A) <span class="opcional">(opcional)</span></label>
-    <select id="dureza_shore_a" name="dureza_shore_a"
-            {% if errores.dureza_shore_a %}class="con-error" aria-invalid="true" aria-describedby="error-dureza_shore_a"{% endif %}>
-      <option value="">— sin dato —</option>
-      {% for dureza in durezas %}
-        <option value="{{ dureza }}" {% if valores.dureza_shore_a == dureza|string %}selected{% endif %}>{{ dureza }}</option>
-      {% endfor %}
-    </select>
-    {{ error("dureza_shore_a") }}
-  </div>
-
-  <div class="campo">
-    <label for="cantidad">Cantidad producida (unidades)</label>
-    <input type="number" id="cantidad" name="cantidad" required min="1" step="1"
-           inputmode="numeric" placeholder="Ej.: 50"
-           value="{{ valores.cantidad or '' }}"
-           {% if errores.cantidad %}class="con-error" aria-invalid="true" aria-describedby="error-cantidad"{% endif %}>
-    {{ error("cantidad") }}
-  </div>
-
-  <div class="fila">
-    {{ campo_gramos("material_recibido_g", "Material recibido") }}
-    {{ campo_gramos("material_sobrante_g", "Material sobrante") }}
-  </div>
-
-  <div class="campo campo-casilla">
-    <input type="checkbox" id="lleva_lona" name="lleva_lona" value="si"
-           {% if valores.lleva_lona == "si" %}checked{% endif %}>
-    <label for="lleva_lona">¿Lleva lona?</label>
-  </div>
-
-  {# formulario.js lo oculta si no lleva lona y vuelve obligatorios sus campos si lleva #}
-  <fieldset id="seccion-lona" class="seccion-lona">
-    <legend>Lona</legend>
-    <div class="fila">
-      {{ campo_gramos("lona_recibida_g", "Lona recibida", obligatorio=false) }}
-      {{ campo_gramos("lona_sobrante_g", "Lona sobrante", obligatorio=false) }}
-    </div>
-  </fieldset>
-
-  <div class="campo">
-    <label for="observaciones">Observaciones <span class="opcional">(opcional)</span></label>
-    <textarea id="observaciones" name="observaciones" rows="3" maxlength="500"
-              placeholder="Ej.: 2 piezas con burbuja"
-              {% if errores.observaciones %}class="con-error" aria-invalid="true" aria-describedby="error-observaciones"{% endif %}>{{ valores.observaciones or '' }}</textarea>
-    {{ error("observaciones") }}
   </div>
 
   {% if corrigiendo %}
     <div class="botones">
       <a href="{{ volver }}" class="boton boton-secundario">Cancelar</a>
-      <button type="submit" class="boton">Guardar cambios</button>
+      <button type="submit" class="boton" data-enviando="Guardando…">Guardar cambios</button>
     </div>
   {% else %}
-    <button type="submit" class="boton">Guardar registro</button>
+    {# formulario.js lo cambia a "Guardando…" y lo desactiva al enviar #}
+    <button type="submit" class="boton" data-enviando="Guardando…">Guardar registro</button>
   {% endif %}
 </form>
 {% endblock %}

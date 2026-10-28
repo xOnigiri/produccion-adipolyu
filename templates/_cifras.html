@@ -1,0 +1,27 @@
+{# Tarjetas de números grandes. Las usan Registrar ("Esta semana") e Historial.
+   comparacion: {"etiqueta": "Semana pasada", "totales": ...} o None (sin la línea pequeña). #}
+
+{% macro cifra(nombre, valor, unidad, antes, etiqueta) %}
+  <div class="cifra">
+    <p class="cifra-nombre">{{ nombre }}</p>
+    <p class="cifra-valor">{{ valor }}{% if unidad %}<span class="cifra-unidad">{{ unidad }}</span>{% endif %}</p>
+    {% if etiqueta %}
+      <p class="cifra-antes">{{ etiqueta }}: {{ antes }}{% if unidad %} {{ unidad }}{% endif %}</p>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro tarjetas(totales, comparacion, con_lona=true) %}
+  {% set antes = comparacion.totales if comparacion else none %}
+  {% set etiqueta = comparacion.etiqueta if comparacion else none %}
+  <div class="cifras">
+    {{ cifra("Piezas producidas", totales.piezas, "", antes.piezas if antes, etiqueta) }}
+    {{ cifra("Material usado", totales.material_usado_g|numero_kg, "kg",
+             antes.material_usado_g|numero_kg if antes, etiqueta) }}
+    {% if con_lona %}
+      {{ cifra("Lona usada", totales.lona_usada_g|numero_kg, "kg",
+               antes.lona_usada_g|numero_kg if antes, etiqueta) }}
+    {% endif %}
+    {{ cifra("Pedidos", totales.pedidos, "", antes.pedidos if antes, etiqueta) }}
+  </div>
+{% endmacro %}

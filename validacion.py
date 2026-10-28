@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from datetime import date
 
 from crear_base import DUREZAS_SHORE_A
-from formato import texto_gramos
+from markupsafe import Markup
+
+from formato import nombre_en_negrita, texto_gramos
 
 # Límites de sentido común para atrapar errores de tipeo (un cero de más)
 MAX_GRAMOS = 1_000_000  # 1000 kg en un solo pedido
@@ -134,7 +136,9 @@ def _validar_dureza(formulario, errores):
     if not texto:
         return None
     if not texto.isdigit() or int(texto) not in DUREZAS_SHORE_A:
-        errores["dureza_shore_a"] = "Elige una dureza de la lista o «— sin dato —»."
+        errores["dureza_shore_a"] = Markup(
+            "Elige una dureza de la lista o <strong>— sin dato —</strong>."
+        )
         return None
     return int(texto)
 
@@ -259,5 +263,5 @@ def validar_nombre(texto, existentes, propio=None):
     for fila in existentes:
         es_el_mismo = propio is not None and fila["id"] == propio["id"]
         if not es_el_mismo and clave_nombre(fila["nombre"]) == clave:
-            return None, f"Ya existe «{fila['nombre']}».", fila
+            return None, Markup("Ya existe {}.").format(nombre_en_negrita(fila["nombre"])), fila
     return nombre, None, None

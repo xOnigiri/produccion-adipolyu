@@ -34,6 +34,7 @@ from flask import (
     send_file,
     url_for,
 )
+from markupsafe import Markup
 
 import base_datos
 import calculos
@@ -125,6 +126,8 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
         fecha_hora=formato.texto_fecha_hora,
         gramos=lambda gramos: formato.texto_gramos(gramos) + " g",
         kg=formato.texto_kg,
+        numero_kg=formato.numero_kg,
+        nombre=formato.nombre_visible,
         g_por_pieza=formato.texto_g_por_pieza,
         material_usado=calculos.material_usado_g,
         lona_usada=calculos.lona_usada_g,
@@ -135,7 +138,11 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
     app.jinja_env.globals["max_nombre"] = MAX_NOMBRE
     app.jinja_env.globals["durezas"] = crear_base.DUREZAS_SHORE_A
     app.jinja_env.globals["sin_dureza"] = base_datos.SIN_DUREZA
-    app.context_processor(lambda: {"modo_prueba": app.config["MODO_PRUEBA"]})
+    app.context_processor(lambda: {
+        "modo_prueba": app.config["MODO_PRUEBA"],
+        # Sin el archivo del logo, el menú muestra "ADIPOLYU" en texto
+        "hay_logo": Path(app.config["RUTA_LOGO"]).is_file(),
+    })
     app.context_processor(_aviso_respaldo)
     return app
 
@@ -156,6 +163,15 @@ def _cerrar_conexion(_error):
 @rutas.get("/")
 def inicio():
     return redirect(url_for(".registrar"))
+
+
+@rutas.get("/logo.png")
+def logo():
+    """El mismo archivo que usa el PDF, para el menú (un solo logo en la carpeta)."""
+    ruta = Path(current_app.config["RUTA_LOGO"])
+    if not ruta.is_file():
+        abort(404)
+    return send_file(ruta, mimetype="image/png")
 
 
 @rutas.get("/registrar")
@@ -200,17 +216,35 @@ def _mostrar_formulario(valores, errores, piezas=None, materiales=None, corrigie
         piezas = base_datos.listar_piezas_activas(_conexion())
     if materiales is None:
         materiales = base_datos.listar_materiales_activos(_conexion())
+    hoy = date.today()
     pagina = render_template(
         "registrar.html",
         piezas=piezas,
         materiales=materiales,
         valores=valores,
         errores=errores,
-        hoy=date.today().isoformat(),
+        hoy=hoy.isoformat(),
         corrigiendo=corrigiendo,
         volver=_destino_volver(),
+        # Tarjetas de "Esta semana" (no se muestran al corregir)
+        semana=None if corrigiendo else _totales_semana(hoy),
+        comparacion=None if corrigiendo else _comparacion("Semana pasada", hoy - timedelta(days=7)),
     )
     return pagina, 422 if errores else 200
+
+
+def _totales_semana(dia, **filtros):
+    """Totales de la semana (lunes a domingo) que contiene ese día, sin la papelera."""
+    lunes, domingo = calculos.semana_de(dia)
+    registros = base_datos.listar_registros(
+        _conexion(), desde=lunes.isoformat(), hasta=domingo.isoformat(), **filtros
+    )
+    return calculos.totales(registros)
+
+
+def _comparacion(etiqueta, dia, **filtros):
+    """Lo que va en la línea pequeña debajo de cada tarjeta: 'Semana pasada: 180'."""
+    return {"etiqueta": etiqueta, "totales": _totales_semana(dia, **filtros)}
 
 
 @rutas.get("/historial")
@@ -220,6 +254,7 @@ def historial():
         "historial.html",
         registros=registros,
         totales=totales,
+        comparacion=_comparacion_historial(filtros),
         filtros=filtros,
         periodos=PERIODOS,
         piezas=base_datos.listar_todas_las_piezas(_conexion()),
@@ -264,13 +299,29 @@ def descargar_pdf():
     )
 
 
+def _comparacion_historial(filtros):
+    """La semana anterior a la que se ve, con los mismos filtros de pieza, material
+    y dureza. Solo tiene sentido si se está viendo una semana; con fechas libres
+    o "Todo" no hay con qué comparar y las tarjetas van sin esa línea."""
+    if filtros["error"] or filtros["periodo"] not in ("esta", "pasada"):
+        return None
+    etiqueta = "Semana pasada" if filtros["periodo"] == "esta" else "Semana anterior"
+    return _comparacion(
+        etiqueta,
+        date.fromisoformat(filtros["desde"]) - timedelta(days=7),
+        pieza_id=filtros["pieza_id"],
+        material_id=filtros["material_id"],
+        dureza=filtros["dureza"],
+    )
+
+
 def _texto_filtro_dureza(dureza):
-    """'Dureza: 70 Shore A', 'Dureza: sin dato' o None si se ven todas."""
+    """'Dureza: 70', 'Dureza: sin dato' o None si se ven todas."""
     if dureza is None:
         return None
     if dureza == base_datos.SIN_DUREZA:
         return "Dureza: sin dato"
-    return f"Dureza: {dureza} Shore A"
+    return f"Dureza: {dureza}"
 
 
 def _consultar(args):
@@ -323,8 +374,8 @@ def _textos_informe(filtros, registros, totales, pieza, material):
     elegidos = [
         texto
         for texto in (
-            pieza and f"Pieza: {pieza}",
-            material and f"Material: {material}",
+            pieza and f"Pieza: {formato.nombre_visible(pieza)}",
+            material and f"Material: {formato.nombre_visible(material)}",
             _texto_filtro_dureza(filtros["dureza"]),
         )
         if texto
@@ -348,7 +399,7 @@ def _nombre_archivo_pdf(filtros, registros, pieza, material):
     if filtros["dureza"] == base_datos.SIN_DUREZA:
         partes.append("sin-dureza")
     elif filtros["dureza"] is not None:
-        partes.append(f"shore-a-{filtros['dureza']}")
+        partes.append(f"dureza-{filtros['dureza']}")
     nombre = "_".join(partes) + ".pdf"
     return "PRUEBA_" + nombre if current_app.config["MODO_PRUEBA"] else nombre
 
@@ -473,8 +524,9 @@ def agregar_a_lista(tipo):
         return _mostrar_listas({tipo: {"mensaje": error, "repetido": repetido}}, {tipo: escrito})
 
     flash(
-        f"Se agregó {lista.la} {lista.singular} «{nombre}». "
-        "Ya aparece en el formulario de registro.",
+        Markup("Se agregó {} {} {}. Ya aparece en el formulario de registro.").format(
+            lista.la, lista.singular, formato.nombre_en_negrita(nombre)
+        ),
         "exito",
     )
     return redirect(url_for(".listas"))
@@ -489,7 +541,8 @@ def corregir_nombre(tipo, elemento_id):
     if actual is None:
         return redirect(url_for(".listas"))
 
-    escrito = request.form.get("nombre", actual["nombre"])
+    # Al guardar vuelve a minúsculas (validacion.limpiar_nombre)
+    escrito = request.form.get("nombre", formato.nombre_visible(actual["nombre"]))
     nombre = error = None
     if request.method == "POST":
         nombre, error, _ = validar_nombre(escrito, filas, propio=actual)
@@ -501,8 +554,11 @@ def corregir_nombre(tipo, elemento_id):
             else:
                 usado = actual["registros"] or actual["en_papelera"]
                 flash(
-                    f"Nombre corregido: «{actual['nombre']}» → «{nombre}»."
-                    + (f" Ya se ve así en {_texto_uso(actual)}." if usado else ""),
+                    Markup("Nombre corregido: {} → {}.{}").format(
+                        formato.nombre_en_negrita(actual["nombre"]),
+                        formato.nombre_en_negrita(nombre),
+                        f" Ya se ve así en {_texto_uso(actual)}." if usado else "",
+                    ),
                     "exito",
                 )
                 return redirect(url_for(".listas"))
@@ -530,10 +586,12 @@ def desactivar(tipo, elemento_id):
     if base_datos.desactivar(_conexion(), lista.tabla, elemento_id):
         usado = fila["registros"] or fila["en_papelera"]
         flash(
-            f"«{fila['nombre']}» quedó {lista.genero('inactiv')}: ya no aparece en el "
-            "formulario de registro."
-            + (f" Sus registros ({_texto_uso(fila)}) siguen en el historial y en los "
-               "informes." if usado else ""),
+            Markup("{} quedó {}: ya no aparece en el formulario de registro.{}").format(
+                formato.nombre_en_negrita(fila["nombre"]),
+                lista.genero("inactiv"),
+                f" Sus registros ({_texto_uso(fila)}) siguen en el historial y en los "
+                "informes." if usado else "",
+            ),
             "exito",
         )
     elif fila["activo"]:
@@ -547,8 +605,9 @@ def reactivar(tipo, elemento_id):
     _, fila = _buscar(lista, elemento_id)
     if fila is not None and base_datos.reactivar(_conexion(), lista.tabla, elemento_id):
         flash(
-            f"«{fila['nombre']}» está {lista.genero('activ')} otra vez: "
-            "ya aparece en el formulario de registro.",
+            Markup("{} está {} otra vez: ya aparece en el formulario de registro.").format(
+                formato.nombre_en_negrita(fila["nombre"]), lista.genero("activ")
+            ),
             "exito",
         )
     return redirect(url_for(".listas"))
@@ -584,12 +643,15 @@ def _texto_uso(fila):
 def pagina_respaldo():
     destino = current_app.config["DESTINO_RESPALDO"]
     estado = current_app.config["ESTADO_RESPALDO"]
+    ultimo = respaldo.ultimo_respaldo(estado) if estado else None
     return render_template(
         "respaldo.html",
         destino=destino,
         # Solo se mira si la carpeta existe; abrir la página no escribe nada
         disponible=destino is not None and destino.unidad.is_dir(),
-        ultimo=respaldo.ultimo_respaldo(estado) if estado else None,
+        ultimo=ultimo,
+        dias=(date.today() - ultimo[0].date()).days if ultimo else None,
+        dias_aviso=respaldo.DIAS_AVISO,
         extras=[ruta.name for ruta in respaldo.leer_extras(
             current_app.config["LISTA_EXTRA_RESPALDO"])],
         ruta_db=current_app.config["RUTA_DB"],
@@ -678,8 +740,8 @@ def _valores_de(registro):
     """Un registro guardado, convertido en lo que muestra el formulario."""
 
     def gramos(valor):
-        # Tal como está guardado, sin redondear: 3600.5 -> '3600.5' y 400.0 -> '400'
-        return "" if valor is None else str(valor).removesuffix(".0")
+        # Tal como está guardado, sin redondear: 3600.5 -> '3600,5' y 400.0 -> '400'
+        return "" if valor is None else str(valor).removesuffix(".0").replace(".", ",")
 
     return {
         "fecha": registro["fecha"],
@@ -740,7 +802,8 @@ def _leer_filtros(args, hoy):
             )
             if desde > hasta:
                 filtros["error"] = (
-                    "La fecha «desde» es posterior a «hasta». Cámbialas para ver los registros."
+                    Markup("La fecha <strong>Desde</strong> es posterior a "
+                           "<strong>Hasta</strong>. Cámbialas para ver los registros.")
                 )
         elif desde:
             filtros["descripcion"] = f"Desde el {formato.texto_fecha(desde)}"

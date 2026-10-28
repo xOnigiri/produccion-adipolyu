@@ -21,6 +21,3 @@ __pycache__/
 
 # Configuración local de Claude Code
 .claude/settings.local.json
-
-# Logo: no se sube hasta confirmar que puede ser público
-logo-adipolyu.png
