@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Corregir nombre{% endblock %}
+
+{% block contenido %}
+<h1>Corregir el nombre de {{ lista.la }} {{ lista.singular }}</h1>
+
+<div class="tarjeta">
+  {% if nuevo %}
+    {# Paso 2: confirmar viendo a cuántos registros afecta #}
+    <p class="cambio-nombre">«{{ actual.nombre }}» → «{{ nuevo }}»</p>
+    {% if actual.registros or actual.en_papelera %}
+      <p>
+        Afecta a <strong>{{ actual|uso }}</strong>: todos mostrarán el nombre nuevo, igual que
+        el historial, los filtros y los PDF que generes desde ahora.
+        Los PDF que ya descargaste no cambian.
+      </p>
+    {% else %}
+      <p>No lo usa ningún registro todavía.</p>
+    {% endif %}
+
+    <form method="post" class="botones">
+      <input type="hidden" name="nombre" value="{{ nuevo }}">
+      <input type="hidden" name="paso" value="confirmar">
+      <a href="{{ url_for('produccion.listas') }}" class="boton boton-secundario">No, volver</a>
+      <button type="submit" class="boton">Sí, cambiar el nombre</button>
+    </form>
+  {% else %}
+    {# Paso 1: escribir el nombre corregido #}
+    <p class="nota">
+      Nombre actual: <strong>«{{ actual.nombre }}»</strong> · usado en {{ actual|uso }}.
+    </p>
+    <form method="post">
+      <input type="hidden" name="paso" value="revisar">
+      <div class="campo">
+        <label for="nombre">Nombre corregido</label>
+        <input type="text" id="nombre" name="nombre" value="{{ escrito }}" maxlength="{{ max_nombre }}"
+               autofocus {% if error %}class="con-error" aria-describedby="error-nombre"{% endif %}>
+        {% if error %}<p class="error-campo" id="error-nombre">{{ error }}</p>{% endif %}
+      </div>
+      <div class="botones">
+        <a href="{{ url_for('produccion.listas') }}" class="boton boton-secundario">Cancelar</a>
+        <button type="submit" class="boton">Revisar cambio</button>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

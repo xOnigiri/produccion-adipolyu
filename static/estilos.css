@@ -56,7 +56,7 @@ body {
   opacity: 0.85;
 }
 
-/* Menú: Registrar · Historial · Papelera · Respaldo */
+/* Menú: Registrar · Historial · Papelera · Listas · Respaldo */
 .menu {
   display: flex;
   gap: 4px;
@@ -565,6 +565,104 @@ a.boton {
 .resumen h2 {
   margin: 0 0 10px;
   font-size: 1.1rem;
+}
+
+/* Página "Listas": piezas y materiales lado a lado */
+.contenido-medio {
+  max-width: 1100px;
+}
+
+.listas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.lista-admin {
+  max-width: none;
+}
+
+.conteo {
+  font-weight: 400;
+  color: var(--texto-suave);
+}
+
+.agregar {
+  margin-bottom: 12px;
+}
+
+.agregar label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.con-boton {
+  display: flex;
+  gap: 8px;
+}
+
+.con-boton .boton {
+  flex-shrink: 0;
+}
+
+.reactivar-repetido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+  color: var(--error-texto);
+}
+
+.fila-inactiva td {
+  color: var(--texto-suave);
+}
+
+.papelera-conteo {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+
+.acciones-lista {
+  white-space: nowrap;
+}
+
+.acciones-lista form {
+  display: inline;
+  margin-left: 10px;
+}
+
+.nota-ultimo {
+  display: block;
+  max-width: 220px;
+  white-space: normal;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+}
+
+/* Botón que se ve como enlace (Desactivar, Reactivar) */
+.enlace {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--principal);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.enlace.enlace-borrar {
+  color: var(--error-texto);
+}
+
+.cambio-nombre {
+  margin-top: 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--principal);
+  background: var(--calculado-fondo);
+  font-weight: 600;
 }
 
 .solo-lector {

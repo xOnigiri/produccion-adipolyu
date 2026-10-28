@@ -25,6 +25,8 @@
          {% if pagina in ('produccion.historial', 'produccion.corregir', 'produccion.confirmar_borrado') %}class="activo" aria-current="page"{% endif %}>Historial</a>
       <a href="{{ url_for('produccion.papelera') }}"
          {% if pagina == 'produccion.papelera' %}class="activo" aria-current="page"{% endif %}>Papelera</a>
+      <a href="{{ url_for('produccion.listas') }}"
+         {% if pagina in ('produccion.listas', 'produccion.agregar_a_lista', 'produccion.corregir_nombre') %}class="activo" aria-current="page"{% endif %}>Listas</a>
       <a href="{{ url_for('produccion.pagina_respaldo') }}"
          {% if pagina in ('produccion.pagina_respaldo', 'produccion.exportar_respaldo') %}class="activo" aria-current="page"{% endif %}>Respaldo</a>
     </nav>

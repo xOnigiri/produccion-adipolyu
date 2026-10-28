@@ -33,7 +33,7 @@
     <select id="pieza_id" name="pieza_id">
       <option value="">Todas</option>
       {% for pieza in piezas %}
-        <option value="{{ pieza.id }}" {% if filtros.pieza_id == pieza.id %}selected{% endif %}>{{ pieza.nombre }}</option>
+        <option value="{{ pieza.id }}" {% if filtros.pieza_id == pieza.id %}selected{% endif %}>{{ pieza.nombre }}{% if not pieza.activo %} (inactiva){% endif %}</option>
       {% endfor %}
     </select>
   </div>
@@ -43,7 +43,7 @@
     <select id="material_id" name="material_id">
       <option value="">Todos</option>
       {% for material in materiales %}
-        <option value="{{ material.id }}" {% if filtros.material_id == material.id %}selected{% endif %}>{{ material.nombre }}</option>
+        <option value="{{ material.id }}" {% if filtros.material_id == material.id %}selected{% endif %}>{{ material.nombre }}{% if not material.activo %} (inactivo){% endif %}</option>
       {% endfor %}
     </select>
   </div>

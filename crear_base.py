@@ -2,7 +2,9 @@
 
 Se puede ejecutar varias veces sin riesgo: nunca borra ni sobrescribe datos.
 Solo crea las tablas que falten, agrega las columnas nuevas que falten
-(como borrado_en, de la papelera) y agrega las piezas/materiales que no existan.
+(como borrado_en, de la papelera) y carga las piezas/materiales iniciales
+en una lista vacía. Una lista que ya tiene nombres no se toca: así no
+reaparece un nombre corregido o desactivado desde la página "Listas".
 
 Uso:  python crear_base.py            (base real, produccion.db)
       python crear_base.py otra.db    (otra base, por ejemplo una copia)
@@ -88,6 +90,14 @@ def agregar_columnas_nuevas(conexion):
     return agregadas
 
 
+def cargar_lista_inicial(conexion, tabla, nombres):
+    """Carga los nombres iniciales solo si la lista está vacía. Devuelve cuántos agregó."""
+    if conexion.execute(f"SELECT COUNT(*) FROM {tabla}").fetchone()[0]:
+        return 0
+    conexion.executemany(f"INSERT INTO {tabla} (nombre) VALUES (?)", [(nombre,) for nombre in nombres])
+    return len(nombres)
+
+
 def crear_base(ruta=RUTA_DB, informar=True):
     ruta = Path(ruta)
     ya_existia = ruta.exists()
@@ -98,21 +108,8 @@ def crear_base(ruta=RUTA_DB, informar=True):
         conexion.executescript(ESQUEMA)
         columnas_agregadas = agregar_columnas_nuevas(conexion)
 
-        # INSERT OR IGNORE: si el nombre ya está, no lo duplica
-        nuevas_piezas = 0
-        for nombre in PIEZAS_INICIALES:
-            cursor = conexion.execute(
-                "INSERT OR IGNORE INTO piezas (nombre) VALUES (?)", (nombre,)
-            )
-            nuevas_piezas += cursor.rowcount
-
-        nuevos_materiales = 0
-        for nombre in MATERIALES_INICIALES:
-            cursor = conexion.execute(
-                "INSERT OR IGNORE INTO materiales (nombre) VALUES (?)", (nombre,)
-            )
-            nuevos_materiales += cursor.rowcount
-
+        nuevas_piezas = cargar_lista_inicial(conexion, "piezas", PIEZAS_INICIALES)
+        nuevos_materiales = cargar_lista_inicial(conexion, "materiales", MATERIALES_INICIALES)
         conexion.commit()
 
         total_piezas = conexion.execute("SELECT COUNT(*) FROM piezas").fetchone()[0]

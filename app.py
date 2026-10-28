@@ -17,12 +17,14 @@ import sys
 import threading
 import unicodedata
 import webbrowser
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from flask import (
     Blueprint,
     Flask,
+    abort,
     current_app,
     flash,
     g,
@@ -39,7 +41,7 @@ import datos_prueba
 import formato
 import informe_pdf
 import respaldo
-from validacion import validar_registro
+from validacion import MAX_NOMBRE, validar_nombre, validar_registro
 
 # 127.0.0.1 = solo esta laptop; nadie más en la red puede abrir la app
 HOST = "127.0.0.1"
@@ -57,6 +59,43 @@ PERIODOS = {
 }
 
 rutas = Blueprint("produccion", __name__)
+
+
+@dataclass(frozen=True)
+class Lista:
+    """Una de las dos listas de la página "Listas" y cómo nombrarla en los mensajes."""
+
+    tabla: str
+    titulo: str
+    singular: str
+    femenino: bool
+    ejemplo: str
+
+    def genero(self, raiz):
+        """'activ' -> 'activa' (pieza) o 'activo' (material)."""
+        return raiz + ("a" if self.femenino else "o")
+
+    @property
+    def la(self):
+        return "la" if self.femenino else "el"
+
+    @property
+    def una(self):
+        return "una" if self.femenino else "un"
+
+    @property
+    def aviso_ultimo(self):
+        """Por qué no se puede desactivar el último activo."""
+        return (
+            f"Debe quedar al menos {self.una} {self.singular} {self.genero('activ')}. "
+            f"Agrega o reactiva {self.genero('otr')} primero."
+        )
+
+
+LISTAS = {
+    "piezas": Lista("piezas", "Piezas", "pieza", True, "buje"),
+    "materiales": Lista("materiales", "Materiales", "material", False, "jebe negro"),
+}
 
 
 def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
@@ -89,7 +128,9 @@ def crear_app(ruta_db=None, modo_prueba=False, ruta_logo=RUTA_LOGO):
         material_usado=calculos.material_usado_g,
         lona_usada=calculos.lona_usada_g,
         gramos_por_pieza=calculos.gramos_por_pieza,
+        uso=_texto_uso,
     )
+    app.jinja_env.globals["max_nombre"] = MAX_NOMBRE
     app.context_processor(lambda: {"modo_prueba": app.config["MODO_PRUEBA"]})
     app.context_processor(_aviso_respaldo)
     return app
@@ -374,6 +415,148 @@ def restaurar(registro_id):
             "exito",
         )
     return redirect(url_for(".papelera"))
+
+
+@rutas.get("/listas")
+def listas():
+    return _mostrar_listas()
+
+
+def _mostrar_listas(errores=None, escritos=None):
+    """errores / escritos: {tipo: ...} de la lista donde no se pudo agregar."""
+    errores = errores or {}
+    pagina = render_template(
+        "listas.html",
+        listas=[
+            (tipo, lista, base_datos.listar_con_uso(_conexion(), lista.tabla))
+            for tipo, lista in LISTAS.items()
+        ],
+        errores=errores,
+        escritos=escritos or {},
+    )
+    return pagina, 422 if errores else 200
+
+
+@rutas.post("/listas/<tipo>/agregar")
+def agregar_a_lista(tipo):
+    lista = _lista(tipo)
+    escrito = request.form.get("nombre", "")
+    filas = base_datos.listar_con_uso(_conexion(), lista.tabla)
+    nombre, error, repetido = validar_nombre(escrito, filas)
+    if error is None:
+        try:
+            base_datos.agregar_a_lista(_conexion(), lista.tabla, nombre)
+        except sqlite3.IntegrityError:
+            error = "La base de datos rechazó el nombre porque ya existe. Revisa la lista."
+    if error:
+        return _mostrar_listas({tipo: {"mensaje": error, "repetido": repetido}}, {tipo: escrito})
+
+    flash(
+        f"Se agregó {lista.la} {lista.singular} «{nombre}». "
+        "Ya aparece en el formulario de registro.",
+        "exito",
+    )
+    return redirect(url_for(".listas"))
+
+
+@rutas.route("/listas/<tipo>/<int:elemento_id>/nombre", methods=["GET", "POST"])
+def corregir_nombre(tipo, elemento_id):
+    """Dos pasos: primero se escribe y se revisa; luego se confirma viendo
+    a cuántos registros afecta."""
+    lista = _lista(tipo)
+    filas, actual = _buscar(lista, elemento_id)
+    if actual is None:
+        return redirect(url_for(".listas"))
+
+    escrito = request.form.get("nombre", actual["nombre"])
+    nombre = error = None
+    if request.method == "POST":
+        nombre, error, _ = validar_nombre(escrito, filas, propio=actual)
+        if error is None and request.form.get("paso") == "confirmar":
+            try:
+                base_datos.renombrar(_conexion(), lista.tabla, elemento_id, nombre)
+            except sqlite3.IntegrityError:
+                error = "La base de datos rechazó el nombre porque ya existe. Revisa la lista."
+            else:
+                usado = actual["registros"] or actual["en_papelera"]
+                flash(
+                    f"Nombre corregido: «{actual['nombre']}» → «{nombre}»."
+                    + (f" Ya se ve así en {_texto_uso(actual)}." if usado else ""),
+                    "exito",
+                )
+                return redirect(url_for(".listas"))
+
+    pagina = render_template(
+        "corregir_nombre.html",
+        tipo=tipo,
+        lista=lista,
+        actual=actual,
+        escrito=escrito,
+        error=error,
+        # Si el nombre pasó la revisión, se muestra la confirmación
+        nuevo=None if error else nombre,
+    )
+    return pagina, 422 if error else 200
+
+
+@rutas.post("/listas/<tipo>/<int:elemento_id>/desactivar")
+def desactivar(tipo, elemento_id):
+    lista = _lista(tipo)
+    _, fila = _buscar(lista, elemento_id)
+    if fila is None:
+        return redirect(url_for(".listas"))
+
+    if base_datos.desactivar(_conexion(), lista.tabla, elemento_id):
+        usado = fila["registros"] or fila["en_papelera"]
+        flash(
+            f"«{fila['nombre']}» quedó {lista.genero('inactiv')}: ya no aparece en el "
+            "formulario de registro."
+            + (f" Sus registros ({_texto_uso(fila)}) siguen en el historial y en los "
+               "informes." if usado else ""),
+            "exito",
+        )
+    elif fila["activo"]:
+        flash(lista.aviso_ultimo, "error")
+    return redirect(url_for(".listas"))
+
+
+@rutas.post("/listas/<tipo>/<int:elemento_id>/reactivar")
+def reactivar(tipo, elemento_id):
+    lista = _lista(tipo)
+    _, fila = _buscar(lista, elemento_id)
+    if fila is not None and base_datos.reactivar(_conexion(), lista.tabla, elemento_id):
+        flash(
+            f"«{fila['nombre']}» está {lista.genero('activ')} otra vez: "
+            "ya aparece en el formulario de registro.",
+            "exito",
+        )
+    return redirect(url_for(".listas"))
+
+
+def _lista(tipo):
+    if tipo not in LISTAS:
+        abort(404)
+    return LISTAS[tipo]
+
+
+def _buscar(lista, elemento_id):
+    """Toda la lista y la fila buscada, o None (con un aviso) si no existe."""
+    filas = base_datos.listar_con_uso(_conexion(), lista.tabla)
+    fila = next((fila for fila in filas if fila["id"] == elemento_id), None)
+    if fila is None:
+        flash(f"Ese nombre no está en la lista de {lista.titulo.lower()}.", "error")
+    return filas, fila
+
+
+def _texto_uso(fila):
+    """'12 registros', '1 registro (y 1 en la papelera)' o 'ningún registro'."""
+    vigentes, en_papelera = fila["registros"], fila["en_papelera"]
+    if not vigentes and not en_papelera:
+        return "ningún registro"
+    texto = f"{vigentes} {'registro' if vigentes == 1 else 'registros'}"
+    if en_papelera:
+        texto += f" (y {en_papelera} en la papelera)"
+    return texto
 
 
 @rutas.get("/respaldo")

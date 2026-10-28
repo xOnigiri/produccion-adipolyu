@@ -1,4 +1,5 @@
-"""Reglas del taller para aceptar un registro de producción.
+"""Reglas del taller para aceptar un registro de producción
+y los nombres de piezas y materiales.
 
 No sabe nada de Flask ni de la base de datos: recibe lo que llegó del
 formulario (todo es texto) y devuelve los datos limpios o los errores.
@@ -6,6 +7,7 @@ Por eso se puede probar sola.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
@@ -15,6 +17,7 @@ from formato import texto_gramos
 MAX_GRAMOS = 1_000_000  # 1000 kg en un solo pedido
 MAX_CANTIDAD = 100_000
 MAX_OBSERVACIONES = 500
+MAX_NOMBRE = 40  # nombre de una pieza o material
 
 # Número con decimales opcionales, ya con la coma cambiada por punto: 3600 o 3600.5
 _NUMERO = re.compile(r"-?\d+(\.\d+)?")
@@ -203,3 +206,45 @@ def _validar_observaciones(formulario, errores):
 
 def _mayuscula(texto):
     return texto[0].upper() + texto[1:]
+
+
+def limpiar_nombre(texto):
+    """Cómo se guarda un nombre: '  Silicona   NARANJA ' -> 'silicona naranja'."""
+    return " ".join(unicodedata.normalize("NFC", texto).split()).lower()
+
+
+def clave_nombre(texto):
+    """Lo que se compara para detectar duplicados: sin mayúsculas, sin espacios
+    de más y sin tildes ('Retén', ' RETEN ' y 'reten' -> 'reten'). La ñ se respeta."""
+    letras = []
+    for letra in unicodedata.normalize("NFD", limpiar_nombre(texto)):
+        # En la forma NFD la tilde va aparte: 'é' = 'e' + tilde; 'ñ' = 'n' + virgulilla
+        es_enie = letra == "̃" and letras and letras[-1] == "n"
+        if unicodedata.combining(letra) and not es_enie:
+            continue
+        letras.append(letra)
+    return unicodedata.normalize("NFC", "".join(letras))
+
+
+def validar_nombre(texto, existentes, propio=None):
+    """Revisa el nombre de una pieza o material nuevo, o el corregido.
+
+    existentes: toda la lista (activos e inactivos), con id y nombre.
+    propio: el que se está corrigiendo; None si es nuevo. Puede cambiar solo en
+    tildes o mayúsculas ('reten' -> 'retén') porque sigue siendo el mismo.
+    Devuelve (nombre, error, repetido); repetido es el que ya usa ese nombre.
+    """
+    nombre = limpiar_nombre(texto)
+    if not nombre:
+        return None, "Escribe el nombre.", None
+    if len(nombre) > MAX_NOMBRE:
+        return None, f"El nombre puede tener hasta {MAX_NOMBRE} caracteres.", None
+    if propio is not None and nombre == propio["nombre"]:
+        return None, "Es el mismo nombre que ya tiene. Escribe el nombre corregido.", None
+
+    clave = clave_nombre(nombre)
+    for fila in existentes:
+        es_el_mismo = propio is not None and fila["id"] == propio["id"]
+        if not es_el_mismo and clave_nombre(fila["nombre"]) == clave:
+            return None, f"Ya existe «{fila['nombre']}».", fila
+    return nombre, None, None

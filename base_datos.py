@@ -85,11 +85,86 @@ def listar_materiales_activos(conexion, incluir_id=None):
 
 def listar_todas_las_piezas(conexion):
     """Activas y desactivadas: para filtrar el historial, que tiene registros antiguos."""
-    return conexion.execute("SELECT id, nombre FROM piezas ORDER BY nombre").fetchall()
+    return conexion.execute("SELECT id, nombre, activo FROM piezas ORDER BY nombre").fetchall()
 
 
 def listar_todos_los_materiales(conexion):
-    return conexion.execute("SELECT id, nombre FROM materiales ORDER BY nombre").fetchall()
+    return conexion.execute(
+        "SELECT id, nombre, activo FROM materiales ORDER BY nombre"
+    ).fetchall()
+
+
+# Listas que se administran en la página "Listas" y su columna en produccion.
+# Solo se aceptan estas dos tablas, porque su nombre va dentro del SQL.
+_COLUMNA_EN_PRODUCCION = {"piezas": "pieza_id", "materiales": "material_id"}
+
+
+def _tabla_de_lista(tabla):
+    if tabla not in _COLUMNA_EN_PRODUCCION:
+        raise ValueError(f"No es una lista administrable: {tabla}")
+    return tabla
+
+
+def listar_con_uso(conexion, tabla):
+    """Toda la lista (activos primero) con cuántos registros usan cada nombre:
+    registros = vigentes; en_papelera = los de la papelera."""
+    columna = _COLUMNA_EN_PRODUCCION[_tabla_de_lista(tabla)]
+    return conexion.execute(
+        f"""
+        SELECT lista.id, lista.nombre, lista.activo,
+               COUNT(produccion.id) - COUNT(produccion.borrado_en) AS registros,
+               COUNT(produccion.borrado_en) AS en_papelera
+        FROM {tabla} AS lista
+        LEFT JOIN produccion ON produccion.{columna} = lista.id
+        GROUP BY lista.id
+        ORDER BY lista.activo DESC, lista.nombre
+        """
+    ).fetchall()
+
+
+def agregar_a_lista(conexion, tabla, nombre):
+    """Agrega un nombre ya validado (activo). Devuelve su id."""
+    tabla = _tabla_de_lista(tabla)
+    with conexion:
+        cursor = conexion.execute(f"INSERT INTO {tabla} (nombre) VALUES (?)", (nombre,))
+    return cursor.lastrowid
+
+
+def renombrar(conexion, tabla, elemento_id, nombre):
+    """Cambia el nombre. Los registros guardan el id, no el nombre, así que todos
+    muestran el nombre nuevo sin reescribir ninguno. Devuelve True si se cambió."""
+    tabla = _tabla_de_lista(tabla)
+    with conexion:
+        cursor = conexion.execute(
+            f"UPDATE {tabla} SET nombre = ? WHERE id = ?", (nombre, elemento_id)
+        )
+    return cursor.rowcount == 1
+
+
+def desactivar(conexion, tabla, elemento_id):
+    """Lo saca del formulario (nunca se borra). No desactiva el último activo:
+    la comprobación va en el mismo UPDATE. Devuelve True si se desactivó."""
+    tabla = _tabla_de_lista(tabla)
+    with conexion:
+        cursor = conexion.execute(
+            f"""
+            UPDATE {tabla} SET activo = 0
+            WHERE id = ? AND activo = 1
+              AND (SELECT COUNT(*) FROM {tabla} WHERE activo = 1) > 1
+            """,
+            (elemento_id,),
+        )
+    return cursor.rowcount == 1
+
+
+def reactivar(conexion, tabla, elemento_id):
+    """Lo devuelve al formulario. Devuelve True si se reactivó."""
+    tabla = _tabla_de_lista(tabla)
+    with conexion:
+        cursor = conexion.execute(
+            f"UPDATE {tabla} SET activo = 1 WHERE id = ? AND activo = 0", (elemento_id,)
+        )
+    return cursor.rowcount == 1
 
 
 def guardar_registro(conexion, registro):

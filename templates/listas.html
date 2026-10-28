@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block titulo %}Listas{% endblock %}
+{% block ancho %}contenido-medio{% endblock %}
+
+{% block contenido %}
+<h1>Piezas y materiales</h1>
+<p class="nota">
+  Lo que está activo aparece en el formulario de registro. Nada se borra: al desactivar,
+  los registros antiguos siguen en el historial, los filtros y los informes.
+</p>
+
+<div class="listas">
+  {% for tipo, lista, filas in listas %}
+    {% set activos = filas|selectattr("activo")|list|length %}
+    {% set error = errores.get(tipo) %}
+    <section class="resumen lista-admin">
+      <h2>{{ lista.titulo }} <span class="conteo">· {{ activos }} {{ lista.genero("activ") }}s</span></h2>
+
+      <form method="post" action="{{ url_for('produccion.agregar_a_lista', tipo=tipo) }}" class="agregar">
+        <label for="nombre-{{ tipo }}">Agregar {{ lista.una }} {{ lista.singular }}</label>
+        <div class="con-boton">
+          <input type="text" id="nombre-{{ tipo }}" name="nombre" maxlength="{{ max_nombre }}"
+                 placeholder="Ejemplo: {{ lista.ejemplo }}" value="{{ escritos.get(tipo, '') }}"
+                 {% if error %}class="con-error" aria-describedby="error-{{ tipo }}"{% endif %}>
+          <button type="submit" class="boton boton-pequeno">Agregar</button>
+        </div>
+        {% if error %}
+          <p class="error-campo" id="error-{{ tipo }}">{{ error.mensaje }}</p>
+        {% endif %}
+      </form>
+      {# Si el nombre ya existe pero está inactivo, se ofrece reactivarlo en vez de crear otro #}
+      {% if error and error.repetido and not error.repetido.activo %}
+        <form method="post" action="{{ url_for('produccion.reactivar', tipo=tipo, elemento_id=error.repetido.id) }}" class="reactivar-repetido">
+          <span>Está {{ lista.genero("inactiv") }}.</span>
+          <button type="submit" class="boton boton-pequeno">Reactivar «{{ error.repetido.nombre }}»</button>
+        </form>
+      {% endif %}
+
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th class="numero">Registros</th>
+            <th><span class="solo-lector">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in filas %}
+            <tr {% if not fila.activo %}class="fila-inactiva"{% endif %}>
+              <td>{{ fila.nombre }}</td>
+              <td>{{ lista.genero("Activ") if fila.activo else lista.genero("Inactiv") }}</td>
+              <td class="numero">
+                {{ fila.registros }}
+                {% if fila.en_papelera %}<span class="papelera-conteo">+{{ fila.en_papelera }} en papelera</span>{% endif %}
+              </td>
+              <td class="acciones-lista">
+                <a href="{{ url_for('produccion.corregir_nombre', tipo=tipo, elemento_id=fila.id) }}">Corregir nombre</a>
+                {% if not fila.activo %}
+                  <form method="post" action="{{ url_for('produccion.reactivar', tipo=tipo, elemento_id=fila.id) }}">
+                    <button type="submit" class="enlace">Reactivar</button>
+                  </form>
+                {% elif activos > 1 %}
+                  <form method="post" action="{{ url_for('produccion.desactivar', tipo=tipo, elemento_id=fila.id) }}">
+                    <button type="submit" class="enlace enlace-borrar">Desactivar</button>
+                  </form>
+                {% else %}
+                  <span class="nota-ultimo">{{ lista.aviso_ultimo }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endfor %}
+</div>
+{% endblock %}
